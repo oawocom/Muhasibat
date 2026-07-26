@@ -1,0 +1,46 @@
+# OAWO Mühasibat — standalone product (ayrıca, mövcud platformadan asılı deyil)
+# İşə salmaq:  docker compose up -d --build
+# Ünvan:       http://localhost:8090   (admin@oawo.com / admin123)
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: oawo_muhasibat_db
+    environment:
+      POSTGRES_USER: oawo
+      POSTGRES_PASSWORD: oawo
+      POSTGRES_DB: oawo_muhasibat
+    volumes:
+      - muhasibat_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oawo -d oawo_muhasibat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: ./backend
+    container_name: oawo_muhasibat_app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: oawo
+      DB_PASSWORD: oawo
+      DB_NAME: oawo_muhasibat
+      DB_SSLMODE: disable
+      PORT: "8080"
+      GIN_MODE: release
+      JWT_SECRET: "change-me-in-production"
+      ADMIN_EMAIL: "admin@oawo.com"
+      ADMIN_PASSWORD: "admin123"
+      COMPANY_NAME: "OAWO MMC"
+    ports:
+      - "8090:8080"
+    restart: unless-stopped
+
+volumes:
+  muhasibat_pg:
