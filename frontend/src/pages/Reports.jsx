@@ -70,7 +70,7 @@ function Trial({ d }) {
         {d.balanced ? <span className="text-ok">✓ Balans bərabərdir</span> : <span className="text-danger">⚠ Balanssızlıq</span>}
         <span className="ml-2 text-muted">Debet {money(d.total_debit)} = Kredit {money(d.total_credit)}</span>
       </div>
-      <Table title="Dövriyyə balansı" columns={cols} rows={[...d.rows, { id: 'tot', code: '', name: 'CƏMİ', debit: d.total_debit, credit: d.total_credit }]} />
+      <Table title="Dövriyyə balansı" columns={cols} rows={[...(d.rows || []), { id: 'tot', code: '', name: 'CƏMİ', debit: d.total_debit, credit: d.total_credit }]} />
     </>
   )
 }
@@ -113,7 +113,7 @@ function ProfitLoss({ d }) {
 }
 
 function PartnerBalances({ d }) {
-  const rows = [...d].sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+  const rows = [...(d || [])].sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
   const cols = [
     { h: 'Tərəfdaş', k: 'name' },
     { h: 'Debitor', right: true, render: (r) => money(r.receivable) },
@@ -129,5 +129,5 @@ function Stock({ d }) {
     { h: 'Qalıq', right: true, render: (r) => money(r.quantity) },
     { h: 'Dəyər', right: true, render: (r) => money(r.value) + ' ₼' },
   ]
-  return <Table title="Anbar qalıqları" columns={cols} rows={d} />
+  return <Table title="Anbar qalıqları" columns={cols} rows={d || []} />
 }
