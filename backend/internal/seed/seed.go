@@ -109,8 +109,8 @@ func seedAccounts(db *gorm.DB) error {
 		// ---- AKTİVLƏR (Assets) ----
 		{Code: "1", Name: "AKTİVLƏR", Type: "asset", Group: true},
 		{Code: "11", Name: "Uzunmüddətli aktivlər", Type: "asset", Parent: "1", Group: true},
-		{Code: "111", Name: "Torpaq, tikili və avadanlıqlar", Type: "asset", Parent: "11"},
-		{Code: "112", Name: "Yığılmış amortizasiya", Type: "asset", Parent: "11"},
+		{Code: "111", Name: "Torpaq, tikili və avadanlıqlar", Type: "asset", SystemKey: "ppe", Parent: "11"},
+		{Code: "112", Name: "Yığılmış amortizasiya", Type: "asset", SystemKey: "accum_dep", Parent: "11"},
 		{Code: "13", Name: "Qeyri-maddi aktivlər", Type: "asset", Parent: "1"},
 
 		{Code: "20", Name: "Qısamüddətli aktivlər", Type: "asset", Parent: "1", Group: true},
@@ -147,6 +147,7 @@ func seedAccounts(db *gorm.DB) error {
 		{Code: "701", Name: "Satılan malların maya dəyəri", Type: "expense", SystemKey: "cogs", Parent: "7"},
 		{Code: "711", Name: "Kommersiya (satış) xərcləri", Type: "expense", SystemKey: "expense", Parent: "7"},
 		{Code: "721", Name: "İnzibati xərclər", Type: "expense", Parent: "7"},
+		{Code: "722", Name: "Amortizasiya xərcləri", Type: "expense", SystemKey: "dep_expense", Parent: "7"},
 		{Code: "731", Name: "Sair əməliyyat xərcləri", Type: "expense", Parent: "7"},
 		{Code: "741", Name: "Maliyyə xərcləri", Type: "expense", Parent: "7"},
 	}

@@ -11,6 +11,7 @@ import Partners from './pages/Partners.jsx'
 import Products from './pages/Products.jsx'
 import Invoices from './pages/Invoices.jsx'
 import Money from './pages/Money.jsx'
+import FixedAssets from './pages/FixedAssets.jsx'
 import Journal from './pages/Journal.jsx'
 import Reports from './pages/Reports.jsx'
 import Ledger from './pages/Ledger.jsx'
@@ -50,6 +51,7 @@ function buildNav(auth) {
     has('partners') && { t: 'Tərəfdaşlar', ic: '☺', path: '/partners' },
     has('products') && { t: 'Məhsul / Xidmət', ic: '▤', path: '/products' },
     { t: 'Hesablar planı', ic: '❏', path: '/accounts' },
+    has('fixed_assets') && { t: 'Əsas vəsaitlər', ic: '🏗', path: '/fixed-assets' },
     { g: 'Hesabatlar' },
     ...REPORTS.filter((r) => has(r.mod)).map((r) => ({ t: r.t, ic: '∑', path: r.path })),
     { g: 'İdarəetmə' },
@@ -163,6 +165,7 @@ export default function App() {
             <Route path="/sales" element={<RequireCompany><Invoices key="sales" type="sales_invoice" /></RequireCompany>} />
             <Route path="/purchases" element={<RequireCompany><Invoices key="purchases" type="purchase_invoice" /></RequireCompany>} />
             <Route path="/money" element={<RequireCompany><Money /></RequireCompany>} />
+            <Route path="/fixed-assets" element={<RequireCompany><FixedAssets /></RequireCompany>} />
             <Route path="/reports/:kind" element={<RequireCompany><Reports /></RequireCompany>} />
             <Route path="/ledger/:id" element={<RequireCompany><Ledger /></RequireCompany>} />
             <Route path="/settings" element={<RequireCompany><Settings /></RequireCompany>} />

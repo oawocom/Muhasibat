@@ -118,6 +118,15 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		t.POST("/documents/:id/post", s.PostDocument)
 		t.DELETE("/documents/:id", s.DeleteDocument)
 
+		// Fixed assets + depreciation
+		t.GET("/fixed-assets", s.ListFixedAssets)
+		t.GET("/fixed-assets/:id", s.GetFixedAsset)
+		t.POST("/fixed-assets", s.CreateFixedAsset)
+		t.PUT("/fixed-assets/:id", s.UpdateFixedAsset)
+		t.DELETE("/fixed-assets/:id", s.DeleteFixedAsset)
+		t.GET("/fixed-assets/:id/depreciation", s.ListDepreciation)
+		t.POST("/depreciation/run", s.RunDepreciationHandler)
+
 		// Reports
 		t.GET("/reports/trial-balance", s.TrialBalance)
 		t.GET("/reports/ledger/:accountId", s.Ledger)

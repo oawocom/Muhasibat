@@ -204,6 +204,44 @@ type Setting struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// ==================== FIXED ASSETS ====================
+// Straight-line depreciation. Each asset carries the three accounts used by
+// the posting engine so it works on any chart of accounts.
+type FixedAsset struct {
+	ID              uint      `json:"id" gorm:"primaryKey"`
+	Code            string    `json:"code" gorm:"size:32;index"`
+	Name            string    `json:"name" gorm:"size:255;not null"`
+	Category        string    `json:"category" gorm:"size:100"`
+	AcquisitionDate Date      `json:"acquisition_date" gorm:"index;not null"`
+	Cost            float64   `json:"cost" gorm:"type:decimal(18,2);default:0"`         // ilkin dəyər
+	SalvageValue    float64   `json:"salvage_value" gorm:"type:decimal(18,2);default:0"` // qalıq dəyər
+	UsefulLifeMonths int      `json:"useful_life_months" gorm:"default:12"`
+	Method          string    `json:"method" gorm:"size:24;default:straight_line"`
+	// Accounts used when posting depreciation.
+	AssetAccountID   uint `json:"asset_account_id"`
+	AccumAccountID   uint `json:"accum_account_id"`   // yığılmış amortizasiya (kontr-aktiv)
+	ExpenseAccountID uint `json:"expense_account_id"` // amortizasiya xərci
+	// Running state.
+	MonthsDepreciated       int       `json:"months_depreciated" gorm:"default:0"`
+	AccumulatedDepreciation float64   `json:"accumulated_depreciation" gorm:"type:decimal(18,2);default:0"`
+	BookValue               float64   `json:"book_value" gorm:"type:decimal(18,2);default:0"`
+	Status                  string    `json:"status" gorm:"size:24;index;default:active"` // active|fully_depreciated|disposed
+	DisposedDate            *Date     `json:"disposed_date"`
+	Notes                   string    `json:"notes" gorm:"type:text"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
+}
+
+// DepreciationEntry records one month of depreciation for an asset.
+type DepreciationEntry struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	AssetID   uint      `json:"asset_id" gorm:"index;not null"`
+	Period    Date      `json:"period" gorm:"index"` // ayın birinci günü
+	Amount    float64   `json:"amount" gorm:"type:decimal(18,2)"`
+	JournalID *uint     `json:"journal_id" gorm:"index"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // TenantModels returns every accounting model — migrated into each
 // company's own database. (Users live in the platform DB, not here.)
 func TenantModels() []interface{} {
@@ -211,5 +249,6 @@ func TenantModels() []interface{} {
 		&Currency{}, &Account{}, &Partner{}, &TaxRate{}, &Warehouse{},
 		&Product{}, &StockMove{}, &JournalEntry{}, &JournalLine{},
 		&Document{}, &DocumentLine{}, &Sequence{}, &Setting{},
+		&FixedAsset{}, &DepreciationEntry{},
 	}
 }
