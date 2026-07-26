@@ -97,6 +97,32 @@ func (m *Manager) Provision(companyID uint, dbName string) (*gorm.DB, error) {
 	return db, nil
 }
 
+// MigrateAll brings every already-provisioned company database up to the
+// current tenant schema. Run at startup so models added after a company was
+// created (e.g. the POS tables) reach existing databases without a manual
+// step. AutoMigrate is additive and idempotent — safe to run on every boot.
+func (m *Manager) MigrateAll() error {
+	var companies []models.Company
+	if err := m.platform.Where("provisioned = ?", true).Find(&companies).Error; err != nil {
+		return err
+	}
+	migrated := 0
+	for _, c := range companies {
+		db, err := m.Get(c.ID, c.DBName)
+		if err != nil {
+			log.Printf("⚠ migrate: %s açıla bilmədi: %v", c.DBName, err)
+			continue
+		}
+		if err := db.AutoMigrate(models.TenantModels()...); err != nil {
+			log.Printf("⚠ migrate: %s: %v", c.DBName, err)
+			continue
+		}
+		migrated++
+	}
+	log.Printf("✅ %d/%d şirkət bazası cari sxemə gətirildi", migrated, len(companies))
+	return nil
+}
+
 // createDatabaseIfNotExists issues CREATE DATABASE via the platform connection
 // (runs in autocommit — CREATE DATABASE cannot run inside a transaction).
 func (m *Manager) createDatabaseIfNotExists(dbName string) error {

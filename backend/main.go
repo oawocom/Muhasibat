@@ -33,6 +33,11 @@ func main() {
 	if err := demo.Seed(db, mgr); err != nil {
 		log.Printf("Demo seed xətası (davam edilir): %v", err)
 	}
+	// Bring existing company databases up to the current schema (adds tables
+	// for modules introduced after a company was first provisioned).
+	if err := mgr.MigrateAll(); err != nil {
+		log.Printf("Şirkət miqrasiyası xətası (davam edilir): %v", err)
+	}
 
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)

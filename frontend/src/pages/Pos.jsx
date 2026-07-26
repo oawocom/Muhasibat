@@ -25,6 +25,12 @@ export default function Pos() {
     api.get(`/pos/registers/${regId}/open-session`).then((s) => setSession(s)).catch(() => setSession(null)).finally(() => setLoadingSess(false))
   }, [regId])
 
+  if (registers.error) return (
+    <>
+      <PageHeader title="Kassa (POS)" />
+      <div className="card text-danger">Kassa məlumatı yüklənmədi: {registers.error}</div>
+    </>
+  )
   if (!registers.data) return <Spinner />
 
   const register = registers.data.find((r) => r.id === regId)
