@@ -44,5 +44,24 @@ services:
       - "8090:8080"
     restart: unless-stopped
 
+  # Reverse proxy + TLS (accounting.oawo.com). Cloudflare "Full (strict)"
+  # rejimi ilə işləyir: origin sertifikatını caddy/certs/ qovluğuna qoyun.
+  caddy:
+    image: caddy:2-alpine
+    container_name: oawo_muhasibat_caddy
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/certs:/etc/caddy/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
 volumes:
   muhasibat_pg:
+  caddy_data:
+  caddy_config:

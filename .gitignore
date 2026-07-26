@@ -3,3 +3,5 @@ backend/web/*
 
 # secrets
 .env
+caddy/certs/*.pem
+caddy/certs/*.key

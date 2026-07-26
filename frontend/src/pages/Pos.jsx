@@ -114,6 +114,18 @@ function Terminal({ session, onSessionChange }) {
       return [...c, { product_id: p.id, name: p.name, unit_price: p.sale_price, tax_rate: rate, quantity: 1 }]
     })
   }
+  // A barcode scanner types the code then presses Enter. Match by barcode /
+  // code exactly (or the only visible result), drop it in the cart, clear.
+  function onScanKey(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const code = q.trim()
+    if (!code) return
+    let p = items.find((x) => x.barcode && x.barcode === code)
+    if (!p) p = items.find((x) => (x.code || '').toLowerCase() === code.toLowerCase())
+    if (!p && filtered.length === 1) p = filtered[0]
+    if (p) { add(p); setQ('') } else { toast.err('Məhsul tapılmadı: ' + code) }
+  }
   function taxRate(p) {
     const t = (taxes.data || []).find((x) => x.id === p.tax_rate_id)
     return t ? t.rate : 0
@@ -137,7 +149,7 @@ function Terminal({ session, onSessionChange }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
         {/* products */}
         <div>
-          <Input placeholder="Məhsul axtar (ad / kod / barkod)…" value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" autoFocus />
+          <Input placeholder="Barkodu skan et və ya məhsul axtar (ad / kod)…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onScanKey} className="mb-3" autoFocus />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
             {filtered.map((p) => (
               <button key={p.id} onClick={() => add(p)}

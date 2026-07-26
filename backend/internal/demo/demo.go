@@ -169,9 +169,35 @@ func populate(db *gorm.DB) error {
 	db.Create(&p3)
 	db.Create(&p4)
 
+	// Market (pərakəndə) malları — barkodlu, kassada skan üçün.
+	market := []models.Product{
+		{Name: "Çörək (kütləvi)", Code: "CH-01", Barcode: "4760010000017", Unit: "ədəd", SalePrice: 0.60, CostPrice: 0.35},
+		{Name: "Süd 2.5% 1L", Code: "SUD-1", Barcode: "4760010000024", Unit: "ədəd", SalePrice: 2.20, CostPrice: 1.60},
+		{Name: "Yumurta 10 ədəd", Code: "YUM-10", Barcode: "4760010000031", Unit: "ədəd", SalePrice: 3.50, CostPrice: 2.60},
+		{Name: "İçməli su 5L", Code: "SU-5", Barcode: "4760010000048", Unit: "ədəd", SalePrice: 1.30, CostPrice: 0.80},
+		{Name: "Qara çay 100q", Code: "CAY-100", Barcode: "4760010000055", Unit: "ədəd", SalePrice: 4.80, CostPrice: 3.20},
+		{Name: "Şəkər 1kg", Code: "SEK-1", Barcode: "4760010000062", Unit: "kq", SalePrice: 1.90, CostPrice: 1.40},
+		{Name: "Düyü 1kg", Code: "DUY-1", Barcode: "4760010000079", Unit: "kq", SalePrice: 3.20, CostPrice: 2.30},
+		{Name: "Günəbaxan yağı 1L", Code: "YAG-1", Barcode: "4760010000086", Unit: "ədəd", SalePrice: 4.50, CostPrice: 3.40},
+		{Name: "Coca-Cola 1L", Code: "COLA-1", Barcode: "4760010000093", Unit: "ədəd", SalePrice: 2.00, CostPrice: 1.30},
+		{Name: "Çips 150q", Code: "CIPS-150", Barcode: "4760010000109", Unit: "ədəd", SalePrice: 1.80, CostPrice: 1.10},
+	}
 	var wh models.Warehouse
 	db.First(&wh)
 	whID := wh.ID
+
+	marketLines := make([]models.DocumentLine, 0, len(market))
+	for i := range market {
+		m := &market[i]
+		m.Type = "product"
+		m.TaxRateID = &vatID
+		m.TrackStock = true
+		m.Enabled = true
+		db.Create(m)
+		marketLines = append(marketLines, models.DocumentLine{ProductID: &m.ID, Description: m.Name, Quantity: 100, UnitPrice: m.CostPrice, TaxRate: 18})
+	}
+	// Bring the market goods into stock with one purchase invoice (keeps books balanced).
+	postDoc(db, models.Document{Type: "purchase_invoice", PartnerID: &supp.ID, WarehouseID: &whID, Date: d(20), FxRate: 1, Lines: marketLines})
 
 	// Purchase invoice (stock in) — buy 20 laptops, 30 monitors, 25 chairs.
 	postDoc(db, models.Document{
