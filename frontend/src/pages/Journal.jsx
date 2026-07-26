@@ -14,7 +14,7 @@ export default function Journal() {
   const columns = [
     { h: 'Nömrə', mono: true, k: 'number' },
     { h: 'Tarix', render: (r) => fmtDate(r.date) },
-    { h: 'Təsvir', render: (r) => <span>{r.description}{r.reference && <span className="ml-1 text-slate-400">/ {r.reference}</span>}</span> },
+    { h: 'Təsvir', render: (r) => <span>{r.description}{r.reference && <span className="ml-1 text-muted">/ {r.reference}</span>}</span> },
     { h: 'Debet', right: true, render: (r) => money(r.total_debit) },
     { h: 'Kredit', right: true, render: (r) => money(r.total_credit) },
     { h: 'Status', render: (r) => <Badge status={r.status} /> },
@@ -111,9 +111,9 @@ function JournalModal({ entry, accounts, canWrite, onClose, onSaved }) {
         </div>
       </div>
       <div className="mt-3 flex justify-end gap-8 pr-1">
-        <div><span className="text-slate-400">Debet:</span> <b className="mono">{money(d)}</b></div>
-        <div><span className="text-slate-400">Kredit:</span> <b className="mono">{money(cr)}</b></div>
-        <div><span className="text-slate-400">Fərq:</span> <b className={`mono ${balanced ? 'text-ok' : 'text-danger'}`}>{money(d - cr)}</b></div>
+        <div><span className="text-muted">Debet:</span> <b className="mono">{money(d)}</b></div>
+        <div><span className="text-muted">Kredit:</span> <b className="mono">{money(cr)}</b></div>
+        <div><span className="text-muted">Fərq:</span> <b className={`mono ${balanced ? 'text-ok' : 'text-danger'}`}>{money(d - cr)}</b></div>
       </div>
     </Modal>
   )

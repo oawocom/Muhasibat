@@ -25,7 +25,7 @@ export default function Tenants() {
         <Btn variant="primary" onClick={() => setEdit({ _new: true })}>+ Yeni tenant</Btn>
       </PageHeader>
       <div className="card mb-5">
-        <div className="text-slate-400 text-sm">Cəmi aktiv abunə gəliri (aylıq ekvivalent)</div>
+        <div className="text-muted text-sm">Cəmi aktiv abunə gəliri (aylıq ekvivalent)</div>
         <div className="mono text-2xl font-extrabold text-ok">
           {money(data.filter((t) => t.enabled).reduce((s, t) => s + (t.billing_cycle === 'yearly' ? t.subscription_amount / 12 : t.subscription_amount), 0))} ₼
         </div>
@@ -91,7 +91,7 @@ function TenantModal({ tenant, catalog, onClose, onSaved }) {
           {catalog.map((m) => (
             <label key={m.key} className={`flex items-center gap-2 text-sm ${m.core ? 'opacity-60' : ''}`}>
               <input type="checkbox" checked={m.core || mods.has(m.key)} disabled={m.core} onChange={() => toggle(m.key)} />
-              <span>{m.label}{m.core ? <span className="chip ml-1">əsas</span> : m.price ? <span className="text-slate-400"> · {m.price}₼</span> : null}</span>
+              <span>{m.label}{m.core ? <span className="chip ml-1">əsas</span> : m.price ? <span className="text-muted"> · {m.price}₼</span> : null}</span>
             </label>
           ))}
         </div>

@@ -61,7 +61,7 @@ function Trial({ d }) {
     <>
       <div className="card mb-4">
         {d.balanced ? <span className="text-ok">✓ Balans bərabərdir</span> : <span className="text-danger">⚠ Balanssızlıq</span>}
-        <span className="ml-2 text-slate-400">Debet {money(d.total_debit)} = Kredit {money(d.total_credit)}</span>
+        <span className="ml-2 text-muted">Debet {money(d.total_debit)} = Kredit {money(d.total_credit)}</span>
       </div>
       <Table title="Dövriyyə balansı" columns={cols} rows={[...d.rows, { id: 'tot', code: '', name: 'CƏMİ', debit: d.total_debit, credit: d.total_credit }]} />
     </>
@@ -82,7 +82,7 @@ function BalanceSheet({ d }) {
         <Section title="ÖHDƏLİKLƏR" sec={d.liabilities} totalLabel="Cəmi öhdəliklər" />
         <Section title="KAPİTAL" sec={d.equity} totalLabel="Cəmi kapital" />
         <div className="card mb-4">
-          <div className="text-slate-400">Dövrün mənfəəti (zərər)</div>
+          <div className="text-muted">Dövrün mənfəəti (zərər)</div>
           <div className={`mono text-2xl font-extrabold ${d.net_income >= 0 ? 'text-ok' : 'text-danger'}`}>{money(d.net_income)} ₼</div>
         </div>
         <div className="card">{d.balanced ? <span className="text-ok">✓ Aktiv = Passiv ({money(d.assets.total)})</span> : <span className="text-danger">⚠ Aktiv ≠ Passiv</span>}</div>
@@ -95,9 +95,9 @@ function ProfitLoss({ d }) {
   return (
     <>
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="card"><div className="text-slate-400">Gəlirlər</div><div className="mono text-2xl font-extrabold text-ok">{money(d.income.total)} ₼</div></div>
-        <div className="card"><div className="text-slate-400">Xərclər</div><div className="mono text-2xl font-extrabold text-danger">{money(d.expense.total)} ₼</div></div>
-        <div className="card"><div className="text-slate-400">Xalis mənfəət</div><div className={`mono text-2xl font-extrabold ${d.net_profit >= 0 ? 'text-ok' : 'text-danger'}`}>{money(d.net_profit)} ₼</div></div>
+        <div className="card"><div className="text-muted">Gəlirlər</div><div className="mono text-2xl font-extrabold text-ok">{money(d.income.total)} ₼</div></div>
+        <div className="card"><div className="text-muted">Xərclər</div><div className="mono text-2xl font-extrabold text-danger">{money(d.expense.total)} ₼</div></div>
+        <div className="card"><div className="text-muted">Xalis mənfəət</div><div className={`mono text-2xl font-extrabold ${d.net_profit >= 0 ? 'text-ok' : 'text-danger'}`}>{money(d.net_profit)} ₼</div></div>
       </div>
       <Section title="GƏLİRLƏR" sec={d.income} totalLabel="Cəmi gəlir" />
       <Section title="XƏRCLƏR" sec={d.expense} totalLabel="Cəmi xərc" />

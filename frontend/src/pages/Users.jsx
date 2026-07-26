@@ -32,7 +32,7 @@ export default function Users() {
       <PageHeader title="İstifadəçilər">
         <Btn variant="primary" onClick={() => setAdd(true)}>+ İstifadəçi əlavə et</Btn>
       </PageHeader>
-      <div className="card mb-4"><b>{auth.company?.name}</b> <span className="text-slate-400">— bu şirkətin istifadəçiləri və rolları</span></div>
+      <div className="card mb-4"><b>{auth.company?.name}</b> <span className="text-muted">— bu şirkətin istifadəçiləri və rolları</span></div>
       <Table title={`İstifadəçilər (${data.length})`} columns={columns} rows={data} />
       {add && <AddUser cid={cid} roleOpts={roleOpts} onClose={() => setAdd(false)} onSaved={() => { setAdd(false); reload() }} />}
       {editRole && <EditRole cid={cid} user={editRole} roleOpts={roleOpts} onClose={() => setEditRole(null)} onSaved={() => { setEditRole(null); reload() }} />}

@@ -120,7 +120,7 @@ func (s *Server) CreateTenant(c *gin.Context) {
 
 	t := models.Tenant{
 		Name: strings.TrimSpace(req.Name), ContactEmail: req.ContactEmail, ContactPhone: req.ContactPhone,
-		Plan: req.Plan, EnabledModules: string(modJSON), SubscriptionAmount: req.SubscriptionAmount,
+		Plan: req.Plan, EnabledModules: string(modJSON), SubscriptionAmount: ComputeSubscription(modules),
 		BillingCycle: req.BillingCycle, Enabled: true,
 	}
 	if err := s.DB.Create(&t).Error; err != nil {
@@ -190,11 +190,13 @@ func (s *Server) UpdateTenant(c *gin.Context) {
 		t.Plan = *req.Plan
 	}
 	if req.Modules != nil {
-		mj, _ := json.Marshal(ensureCoreModules(*req.Modules))
+		mods := ensureCoreModules(*req.Modules)
+		mj, _ := json.Marshal(mods)
 		t.EnabledModules = string(mj)
+		t.SubscriptionAmount = ComputeSubscription(mods) // price follows modules
 	}
 	if req.SubscriptionAmount != nil {
-		t.SubscriptionAmount = *req.SubscriptionAmount
+		t.SubscriptionAmount = *req.SubscriptionAmount // explicit override
 	}
 	if req.BillingCycle != nil {
 		t.BillingCycle = *req.BillingCycle
@@ -204,6 +206,70 @@ func (s *Server) UpdateTenant(c *gin.Context) {
 	}
 	s.DB.Save(&t)
 	c.JSON(200, s.tenantToView(t))
+}
+
+// ComputeSubscription is the pricing formula: sum of the prices of the
+// enabled non-core modules. Adding a module raises the amount, removing it
+// lowers it.
+func ComputeSubscription(modules []string) float64 {
+	set := map[string]bool{}
+	for _, m := range modules {
+		set[m] = true
+	}
+	var total float64
+	for _, def := range models.ModuleCatalog() {
+		if !def.Core && set[def.Key] {
+			total += def.Price
+		}
+	}
+	return total
+}
+
+// GetMyTenant returns the current tenant admin's own tenant (name, modules,
+// amount) — so they can see and adjust their subscription.
+func (s *Server) GetMyTenant(c *gin.Context) {
+	u, ok := s.currentUser(c)
+	if !ok || u.TenantID == nil {
+		c.JSON(404, gin.H{"detail": "Tenant tapılmadı"})
+		return
+	}
+	var t models.Tenant
+	if err := s.DB.First(&t, *u.TenantID).Error; err != nil {
+		c.JSON(404, gin.H{"detail": "Tenant tapılmadı"})
+		return
+	}
+	c.JSON(200, gin.H{
+		"id": t.ID, "name": t.Name, "plan": t.Plan, "modules": t.Modules(),
+		"subscription_amount": t.SubscriptionAmount, "billing_cycle": t.BillingCycle,
+	})
+}
+
+// UpdateMyTenantModules lets a tenant admin self-select modules; the amount is
+// recomputed from the formula.
+func (s *Server) UpdateMyTenantModules(c *gin.Context) {
+	u, ok := s.currentUser(c)
+	if !ok || u.TenantID == nil || !u.IsTenantAdmin {
+		c.JSON(403, gin.H{"detail": "Yalnız tenant admini modulları dəyişə bilər"})
+		return
+	}
+	var req struct {
+		Modules []string `json:"modules"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"detail": "Yanlış məlumat"})
+		return
+	}
+	var t models.Tenant
+	if err := s.DB.First(&t, *u.TenantID).Error; err != nil {
+		c.JSON(404, gin.H{"detail": "Tenant tapılmadı"})
+		return
+	}
+	mods := ensureCoreModules(req.Modules)
+	mj, _ := json.Marshal(mods)
+	t.EnabledModules = string(mj)
+	t.SubscriptionAmount = ComputeSubscription(mods)
+	s.DB.Save(&t)
+	c.JSON(200, gin.H{"modules": mods, "subscription_amount": t.SubscriptionAmount})
 }
 
 // ensureCoreModules guarantees core modules are always present.

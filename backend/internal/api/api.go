@@ -48,6 +48,10 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		auth.GET("/tenants/:id", s.GetTenant)
 		auth.PUT("/tenants/:id", s.UpdateTenant)
 
+		// Tenant admin: self-service subscription (own tenant only)
+		auth.GET("/my-tenant", s.GetMyTenant)
+		auth.PUT("/my-tenant/modules", s.UpdateMyTenantModules)
+
 		// Companies & members (control-plane)
 		auth.GET("/companies", s.ListCompanies)
 		auth.POST("/companies", s.CreateCompany)

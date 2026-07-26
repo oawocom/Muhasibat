@@ -148,9 +148,9 @@ function InvoiceModal({ type, isSales, partnerType, doc, partners, products, war
       </div>
 
       <div className="mt-3 flex justify-end gap-8 pr-1">
-        <div><span className="text-slate-400">Ara cəm:</span> <b className="mono">{money(sub)} ₼</b></div>
-        <div><span className="text-slate-400">ƏDV:</span> <b className="mono">{money(tax)} ₼</b></div>
-        <div><span className="text-slate-400">Yekun:</span> <b className="mono text-base">{money(sub + tax)} ₼</b></div>
+        <div><span className="text-muted">Ara cəm:</span> <b className="mono">{money(sub)} ₼</b></div>
+        <div><span className="text-muted">ƏDV:</span> <b className="mono">{money(tax)} ₼</b></div>
+        <div><span className="text-muted">Yekun:</span> <b className="mono text-base">{money(sub + tax)} ₼</b></div>
       </div>
     </Modal>
   )

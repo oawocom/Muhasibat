@@ -4,10 +4,10 @@ import { money } from '../api.js'
 import { useAuth } from '../store.jsx'
 
 function Kpi({ icon, label, value, sub, tone }) {
-  const toneCls = tone === 'pos' ? 'text-ok' : tone === 'neg' ? 'text-danger' : 'text-slate-400'
+  const toneCls = tone === 'pos' ? 'text-ok' : tone === 'neg' ? 'text-danger' : 'text-muted'
   return (
     <div className="card">
-      <div className="flex items-center gap-2 text-[13px] text-slate-400"><span>{icon}</span>{label}</div>
+      <div className="flex items-center gap-2 text-[13px] text-muted"><span>{icon}</span>{label}</div>
       <div className="mono mt-2 text-2xl font-extrabold tracking-tight">{value}</div>
       {sub && <div className={`mt-1 text-xs ${toneCls}`}>{sub}</div>}
     </div>

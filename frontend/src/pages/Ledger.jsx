@@ -20,7 +20,7 @@ export default function Ledger() {
       <PageHeader title="Baş kitab" />
       <div className="card mb-4">
         <b>{data.account.code} — {data.account.name}</b>
-        <span className="ml-2 text-slate-400">Açılış: {money(data.opening)} / Bağlanış: <b>{money(data.closing)}</b></span>
+        <span className="ml-2 text-muted">Açılış: {money(data.opening)} / Bağlanış: <b>{money(data.closing)}</b></span>
       </div>
       <Table title="Hesab üzrə hərəkət" columns={cols} rows={data.lines || []} />
     </>

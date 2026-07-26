@@ -100,7 +100,7 @@ function CreateRun({ onClose, onCreated }) {
   return (
     <Modal title="Yeni əmək haqqı hesablaması" onClose={onClose}
       footer={<Btn variant="primary" disabled={busy} onClick={run}>{busy ? 'Hesablanır...' : 'Hesabla'}</Btn>}>
-      <p className="mb-3 text-sm text-slate-400">Seçilmiş ay üçün bütün aktiv işçilərin əmək haqqı, vergi və sosial tutulmaları avtomatik hesablanacaq (layihə kimi). Sonra təsdiqləyib jurnala yaza bilərsiniz.</p>
+      <p className="mb-3 text-sm text-muted">Seçilmiş ay üçün bütün aktiv işçilərin əmək haqqı, vergi və sosial tutulmaları avtomatik hesablanacaq (layihə kimi). Sonra təsdiqləyib jurnala yaza bilərsiniz.</p>
       <Field label="Ay"><Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></Field>
     </Modal>
   )
@@ -139,7 +139,7 @@ function RunDetail({ run, canWrite, onClose, onChanged, onDelete }) {
   )
 }
 function Stat({ label, v, tone }) {
-  return <div className="card"><div className="text-xs text-slate-400">{label}</div><div className={`mono text-lg font-bold ${tone === 'ok' ? 'text-ok' : ''}`}>{money(v)} ₼</div></div>
+  return <div className="card"><div className="text-xs text-muted">{label}</div><div className={`mono text-lg font-bold ${tone === 'ok' ? 'text-ok' : ''}`}>{money(v)} ₼</div></div>
 }
 
 function Config() {
@@ -176,7 +176,7 @@ function Config() {
           {num('medical_emp', 'Tibbi sığorta işçi %')}
           {num('medical_empr', 'Tibbi sığorta işəgötürən %')}
         </div>
-        <p className="mt-2 text-xs text-slate-500">Standart AZ dərəcələri göstərilib — qanun dəyişəndə buradan yeniləyin.</p>
+        <p className="mt-2 text-xs text-muted">Standart AZ dərəcələri göstərilib — qanun dəyişəndə buradan yeniləyin.</p>
       </div>
       <div className="panel mb-4 p-5">
         <h3 className="mb-3 text-[15px] font-semibold">Mühasibat hesabları</h3>

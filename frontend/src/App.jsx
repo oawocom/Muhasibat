@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from './store.jsx'
-import { Spinner, Btn, Modal, Field, Input, useToast } from './ui.jsx'
+import { Spinner, Btn, Modal, Field, Input, useToast, Logo } from './ui.jsx'
 import { api, roleLabel } from './api.js'
 
 import Login from './pages/Login.jsx'
@@ -34,11 +34,10 @@ function buildNav(auth) {
   const { isSuper, enabledModules } = auth
   const has = (m) => !m || !enabledModules || enabledModules.includes(m)
   if (isSuper) {
+    // Superadmin manages only tenants + subscriptions — never company data.
     return [
       { g: 'İdarəetmə' },
       { t: 'Tenantlar (abunələr)', ic: '🗂', path: '/tenants' },
-      { g: 'Hesabatlar', note: 'seçilmiş şirkət üzrə' },
-      ...REPORTS.filter((r) => r.id !== 'stock').map((r) => ({ t: r.t, ic: '∑', path: r.path })),
     ]
   }
   const items = [
@@ -73,12 +72,12 @@ function CompanySwitcher({ onClose }) {
   return (
     <Modal title="Şirkət seçin" onClose={onClose}>
       <div className="space-y-2">
-        {list.length === 0 && <p className="text-slate-400">Sizə hələ şirkət təyin edilməyib. Administratora müraciət edin.</p>}
+        {list.length === 0 && <p className="text-muted">Sizə hələ şirkət təyin edilməyib. Administratora müraciət edin.</p>}
         {list.map((c) => (
           <button key={c.id}
             className="flex w-full items-center justify-between rounded-xl border border-line bg-surface2 px-4 py-3 hover:border-brand"
             onClick={() => { auth.chooseCompany(c); onClose() }}>
-            <span><b>{c.name}</b> <span className="ml-1 text-xs text-slate-400">{roleLabel(c.role)}</span></span>
+            <span><b>{c.name}</b> <span className="ml-1 text-xs text-muted">{roleLabel(c.role)}</span></span>
             <span>›</span>
           </button>
         ))}
@@ -87,43 +86,48 @@ function CompanySwitcher({ onClose }) {
   )
 }
 
-function Sidebar({ onSwitch }) {
+function Sidebar({ onSwitch, theme, onToggleTheme }) {
   const auth = useAuth()
   const nav = buildNav(auth)
   return (
     <aside className="flex w-60 flex-col overflow-y-auto border-r border-line bg-surface">
       <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand to-brand2 font-extrabold text-white">O</div>
+        <Logo className="h-8 w-8" />
         <b className="text-[15px]">OAWO Mühasibat</b>
       </div>
-      <button onClick={onSwitch}
-        className="mx-3 mb-2.5 flex items-center justify-between gap-2 rounded-xl border border-line bg-surface2 px-3 py-2.5 hover:border-brand">
-        <span className="flex flex-col overflow-hidden text-left">
-          <span className="truncate font-bold">{auth.company ? auth.company.name : (auth.isSuper ? 'Şirkət seç (hesabatlar üçün)' : 'Şirkət seç')}</span>
-          <span className="text-[11px] text-slate-400">{auth.company ? roleLabel(auth.company.role) : '—'}</span>
-        </span>
-        <span className="text-slate-400">⇅</span>
-      </button>
+      {!auth.isSuper && (
+        <button onClick={onSwitch}
+          className="mx-3 mb-2.5 flex items-center justify-between gap-2 rounded-xl border border-line bg-surface2 px-3 py-2.5 hover:border-brand">
+          <span className="flex flex-col overflow-hidden text-left">
+            <span className="truncate font-bold">{auth.company ? auth.company.name : 'Şirkət seç'}</span>
+            <span className="text-[11px] text-muted">{auth.company ? roleLabel(auth.company.role) : '—'}</span>
+          </span>
+          <span className="text-muted">⇅</span>
+        </button>
+      )}
       <nav className="px-2.5 pb-3">
         {nav.map((n, i) =>
           n.g ? (
-            <div key={i} className="px-2.5 pb-1 pt-3 text-[11px] uppercase tracking-wider text-slate-500">
-              {n.g}{n.note && <span className="ml-1 lowercase text-slate-600">· {n.note}</span>}
-            </div>
+            <div key={i} className="px-2.5 pb-1 pt-3 text-[11px] uppercase tracking-wider text-muted">{n.g}</div>
           ) : (
             <NavLink key={i} to={n.path} end={n.path === '/'}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg px-3 py-2 font-medium ${
-                  isActive ? 'bg-gradient-to-r from-brand/20 to-brand2/10 text-white' : 'text-slate-400 hover:bg-surface2 hover:text-slate-100'}`}>
+                  isActive ? 'bg-brand/10 text-brand' : 'text-muted hover:bg-surface2 hover:text-text'}`}>
               <span className="w-4 text-center">{n.ic}</span>{n.t}
             </NavLink>
           ),
         )}
       </nav>
       <div className="mt-auto space-y-2 p-3.5">
-        <div className="truncate px-1 text-xs text-slate-400">{auth.user?.name || auth.user?.email}</div>
+        <div className="flex items-center justify-between">
+          <span className="truncate px-1 text-xs text-muted">{auth.user?.name || auth.user?.email}</span>
+          <button onClick={onToggleTheme} title="Tema" className="rounded-lg border border-line bg-surface2 px-2 py-1 text-sm hover:border-brand">
+            {theme === 'dark' ? '☀' : '🌙'}
+          </button>
+        </div>
         <button onClick={auth.logout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 py-2 text-sm font-semibold text-slate-200 hover:border-danger hover:text-danger">
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 py-2 text-sm font-semibold text-text hover:border-danger hover:text-danger">
           ⇥ Çıxış
         </button>
       </div>
@@ -131,14 +135,14 @@ function Sidebar({ onSwitch }) {
   )
 }
 
+
 // Guard for tenant-scoped pages: require an active company.
+// Superadmin has no company context — they only manage tenants.
 function RequireCompany({ children }) {
   const auth = useAuth()
-  if (auth.isSuper && !auth.company) {
-    return <div className="p-10 text-center text-slate-400">Hesabatlar üçün Tenantlar səhifəsindən bir şirkət seçin.</div>
-  }
+  if (auth.isSuper) return <Navigate to="/tenants" replace />
   if (!auth.company) {
-    return <div className="p-10 text-center text-slate-400">Şirkət seçilməyib. Yuxarıdakı düymə ilə şirkət seçin.</div>
+    return <div className="p-10 text-center text-muted">Şirkət seçilməyib. Yuxarıdakı düymə ilə şirkət seçin.</div>
   }
   return children
 }
@@ -146,14 +150,19 @@ function RequireCompany({ children }) {
 export default function App() {
   const auth = useAuth()
   const [switching, setSwitching] = useState(false)
-  const loc = useLocation()
+  const [theme, setTheme] = useState(() => localStorage.getItem('oawo_theme') || 'light')
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    localStorage.setItem('oawo_theme', theme)
+  }, [theme])
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   if (!auth.ready) return <div className="grid h-full place-items-center"><Spinner /></div>
   if (!auth.user) return <Login />
 
   return (
     <div className="flex h-full">
-      <Sidebar onSwitch={() => setSwitching(true)} />
+      <Sidebar onSwitch={() => setSwitching(true)} theme={theme} onToggleTheme={toggleTheme} />
       <main className="flex-1 overflow-y-auto">
         <div className="px-6 py-5">
           <Routes>

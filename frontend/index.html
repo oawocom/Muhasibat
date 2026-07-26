@@ -1,9 +1,16 @@
 <!doctype html>
-<html lang="az" class="dark">
+<html lang="az">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/webp" href="/logo.webp" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OAWO Mühasibat</title>
+    <script>
+      // Apply saved theme before render to avoid a flash. Default: light.
+      try {
+        if (localStorage.getItem('oawo_theme') === 'dark') document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

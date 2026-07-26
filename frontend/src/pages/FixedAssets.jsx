@@ -59,7 +59,7 @@ function AssetModal({ item, accounts, onClose, onSaved, onDelete }) {
   const postable = accounts.filter((a) => !a.is_group)
   const opts = [{ value: '', label: '— seçin —' }, ...postable.map((a) => ({ value: a.id, label: a.code + ' — ' + a.name }))]
   const [f, setF] = useState({
-    code: '', name: '', category: '', acquisition_date: today(), cost: 0, salvage_value: 0, useful_life_months: 60,
+    code: '', name: '', category: '', cost: 0, salvage_value: 0, useful_life_months: 60,
     asset_account_id: bySys(accounts, 'ppe')?.id || '',
     accum_account_id: bySys(accounts, 'accum_dep')?.id || '',
     expense_account_id: bySys(accounts, 'dep_expense')?.id || '',
@@ -129,7 +129,7 @@ function RunModal({ onClose, onDone }) {
   return (
     <Modal title="Amortizasiya hesabla" onClose={onClose}
       footer={<Btn variant="primary" disabled={busy} onClick={run}>{busy ? 'Hesablanır...' : 'Hesabla və kitablaşdır'}</Btn>}>
-      <p className="mb-3 text-sm text-slate-400">Seçilmiş tarixə qədər bütün aktiv əsas vəsaitlər üzrə çatışmayan aylar üçün amortizasiya avtomatik hesablanıb mühasibat jurnalına yazılacaq (Dr amortizasiya xərci / Cr yığılmış amortizasiya).</p>
+      <p className="mb-3 text-sm text-muted">Seçilmiş tarixə qədər bütün aktiv əsas vəsaitlər üzrə çatışmayan aylar üçün amortizasiya avtomatik hesablanıb mühasibat jurnalına yazılacaq (Dr amortizasiya xərci / Cr yığılmış amortizasiya).</p>
       <Field label="Tarixə qədər"><Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></Field>
     </Modal>
   )

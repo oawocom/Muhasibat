@@ -22,13 +22,7 @@ export default function Settings() {
   return (
     <>
       <PageHeader title="Parametrlər" />
-      {auth.tenant && (
-        <div className="card mb-5">
-          <div className="text-slate-400 text-sm">Abunə paketi (modullar administrator tərəfindən idarə olunur)</div>
-          <div className="mt-1 font-semibold">{auth.tenant.name} · {auth.tenant.plan}</div>
-          <div className="mt-1 text-xs text-slate-400">Aktiv modullar: {(auth.tenant.modules || []).length}</div>
-        </div>
-      )}
+      {auth.isTenantAdmin && <Subscription />}
 
       <Table title="Valyutalar" columns={[
         { h: 'Kod', mono: true, k: 'code' }, { h: 'Ad', k: 'name' },
@@ -50,6 +44,66 @@ export default function Settings() {
 
       {edit && <CrudModal {...edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); currencies.reload(); taxes.reload(); warehouses.reload(); toast.ok('Yadda saxlanıldı') }} />}
     </>
+  )
+}
+
+// Subscription: tenant admin self-selects modules; price follows the formula.
+function Subscription() {
+  const auth = useAuth()
+  const toast = useToast()
+  const tenant = useList('/my-tenant', [])
+  const catalog = useList('/module-catalog', [])
+  const [sel, setSel] = useState(null)
+  const [busy, setBusy] = useState(false)
+  if (!tenant.data || !catalog.data) return <div className="card mb-5"><Spinner /></div>
+
+  const current = sel || new Set(tenant.data.modules)
+  const toggle = (key) => {
+    const n = new Set(current); n.has(key) ? n.delete(key) : n.add(key); setSel(n)
+  }
+  const price = catalog.data.filter((m) => !m.core && current.has(m.key)).reduce((s, m) => s + (m.price || 0), 0)
+  const changed = sel !== null
+
+  async function save() {
+    setBusy(true)
+    try {
+      const modules = catalog.data.filter((m) => m.core || current.has(m.key)).map((m) => m.key)
+      await api.put('/my-tenant/modules', { modules })
+      toast.ok('Modullar yeniləndi')
+      await auth.refreshCompanies() // refresh nav with new modules
+      tenant.reload(); setSel(null)
+    } catch (e) { toast.err(e.message) } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="card mb-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">Abunə və modullar — {tenant.data.name}</div>
+          <div className="text-xs text-muted">İstədiyiniz modulları seçin. Ödəniş avtomatik hesablanır.</div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-muted">Aylıq ödəniş</div>
+          <div className="mono text-2xl font-extrabold text-brand">{money(price)} ₼</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {catalog.data.map((m) => {
+          const on = m.core || current.has(m.key)
+          return (
+            <label key={m.key}
+              className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-sm ${on ? 'border-brand bg-brand/5' : 'border-line'} ${m.core ? 'opacity-70' : 'cursor-pointer'}`}>
+              <span className="flex items-center gap-2">
+                <input type="checkbox" checked={on} disabled={m.core} onChange={() => toggle(m.key)} />
+                {m.label}
+              </span>
+              <span className="text-xs text-muted">{m.core ? 'əsas' : (m.price ? m.price + '₼' : 'pulsuz')}</span>
+            </label>
+          )
+        })}
+      </div>
+      {changed && <div className="mt-3"><Btn variant="primary" disabled={busy} onClick={save}>{busy ? 'Yadda saxlanılır...' : 'Modulları yadda saxla'}</Btn></div>}
+    </div>
   )
 }
 

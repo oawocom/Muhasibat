@@ -20,7 +20,7 @@ export default function Partners() {
   const [edit, setEdit] = useState(null)
   if (!data) return <Spinner />
   const columns = [
-    { h: 'Ad', render: (r) => <span><b>{r.name}</b>{r.code && <span className="ml-1 text-slate-400">{r.code}</span>}</span> },
+    { h: 'Ad', render: (r) => <span><b>{r.name}</b>{r.code && <span className="ml-1 text-muted">{r.code}</span>}</span> },
     { h: 'Növ', render: (r) => typeName[r.type] || r.type },
     { h: 'VÖEN', mono: true, k: 'tax_id' },
     { h: 'Telefon', k: 'phone' },

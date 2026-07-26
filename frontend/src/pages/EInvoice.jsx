@@ -65,7 +65,7 @@ function ConfigCard({ cfg, companyName, canWrite }) {
           <Field label="e-Qaimə API ünvanı (endpoint) — gələcək inteqrasiya"><Input value={state.endpoint || ''} onChange={set('endpoint')} placeholder="https://..." /></Field>
           <Field label="API token"><Input value={state.token || ''} onChange={set('token')} /></Field>
           <div className="sm:col-span-2"><Btn variant="primary" onClick={save}>Yadda saxla</Btn>
-            <p className="mt-2 text-xs text-slate-500">Qeyd: dövlət e-qaimə sisteminə avtomatik göndəriş üçün e-taxes.gov.az rəsmi API ünvanı və token lazımdır. Onlar olmadan e-qaimə hazırlanır, rəsmi seriya/nömrəni əl ilə qeyd edirsiniz.</p>
+            <p className="mt-2 text-xs text-muted">Qeyd: dövlət e-qaimə sisteminə avtomatik göndəriş üçün e-taxes.gov.az rəsmi API ünvanı və token lazımdır. Onlar olmadan e-qaimə hazırlanır, rəsmi seriya/nömrəni əl ilə qeyd edirsiniz.</p>
           </div>
         </div>
       )}
@@ -107,7 +107,7 @@ function DetailModal({ e, cfg, canWrite, onClose, onChanged }) {
       </div>
       <div className="panel">
         <div className="border-b border-line px-4 py-2.5 text-sm font-semibold">e-Qaimə məzmunu (payload)</div>
-        <pre className="max-h-80 overflow-auto p-4 text-xs text-slate-300">{JSON.stringify(ei.payload, null, 2)}</pre>
+        <pre className="max-h-80 overflow-auto p-4 text-xs text-muted">{JSON.stringify(ei.payload, null, 2)}</pre>
       </div>
     </Modal>
   )

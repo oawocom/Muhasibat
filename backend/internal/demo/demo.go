@@ -29,9 +29,10 @@ func Seed(pdb *gorm.DB, mgr *tenant.Manager) error {
 	}
 
 	// Tenant + its admin.
-	modules, _ := json.Marshal(models.DefaultEnabledModules())
+	allMods := models.DefaultEnabledModules()
+	modules, _ := json.Marshal(allMods)
 	t := models.Tenant{Name: "Demo MMC", Plan: "pro", EnabledModules: string(modules),
-		SubscriptionAmount: 100, BillingCycle: "monthly", Enabled: true, ContactEmail: email}
+		SubscriptionAmount: priceOf(allMods), BillingCycle: "monthly", Enabled: true, ContactEmail: email}
 	if err := pdb.Create(&t).Error; err != nil {
 		return err
 	}
@@ -59,7 +60,88 @@ func Seed(pdb *gorm.DB, mgr *tenant.Manager) error {
 		log.Printf("demo: populate xətası: %v", err)
 	}
 	log.Printf("🎬 Demo tenant hazırdır: %s / (parol: demo123) — şirkət: %s", email, company.Name)
+
+	// A couple more test tenants with different module sets → different amounts,
+	// so the superadmin tenant list is realistic for a presentation.
+	extraTenant(pdb, mgr, "Alfa Ticarət MMC", "alfa@oawo.com", []string{"partners", "products", "sales", "money", "reports"}, true)
+	extraTenant(pdb, mgr, "Beta Xidmət MMC", "beta@oawo.com", []string{"partners", "sales", "reports", "einvoice"}, false)
 	return nil
+}
+
+// extraTenant creates a lighter test tenant (admin + one company, a little data).
+func extraTenant(pdb *gorm.DB, mgr *tenant.Manager, name, email string, mods []string, withData bool) {
+	var n int64
+	pdb.Model(&models.User{}).Where("email = ?", email).Count(&n)
+	if n > 0 {
+		return
+	}
+	full := ensureCore(mods)
+	mj, _ := json.Marshal(full)
+	t := models.Tenant{Name: name, Plan: "standard", EnabledModules: string(mj),
+		SubscriptionAmount: priceOf(full), BillingCycle: "monthly", Enabled: true, ContactEmail: email}
+	if pdb.Create(&t).Error != nil {
+		return
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.DefaultCost)
+	pdb.Create(&models.User{Email: email, Name: name + " admin", Password: string(hash), TenantID: &t.ID, IsTenantAdmin: true, Enabled: true})
+	company := models.Company{TenantID: t.ID, Name: name, Enabled: true}
+	pdb.Create(&company)
+	company.DBName = tenant.DBNameFor(company.ID)
+	pdb.Save(&company)
+	db, err := mgr.Provision(company.ID, company.DBName)
+	if err != nil {
+		return
+	}
+	pdb.Model(&models.Company{}).Where("id = ?", company.ID).Update("provisioned", true)
+	if withData {
+		var vat models.TaxRate
+		db.Where("is_default = ?", true).First(&vat)
+		vid := vat.ID
+		cust := models.Partner{Name: "Müştəri A", Type: "customer", TaxID: "1400000001", Enabled: true}
+		db.Create(&cust)
+		p := models.Product{Name: "Xidmət paketi", Code: "SVC", Type: "service", Unit: "ədəd", SalePrice: 500, TaxRateID: &vid, Enabled: true}
+		db.Create(&p)
+		var wh models.Warehouse
+		db.First(&wh)
+		postDoc(db, models.Document{Type: "sales_invoice", PartnerID: &cust.ID, WarehouseID: &wh.ID, Date: models.Date{Time: time.Now().AddDate(0, 0, -5)}, FxRate: 1,
+			Lines: []models.DocumentLine{{ProductID: &p.ID, Description: p.Name, Quantity: 2, UnitPrice: 500, TaxRate: 18}}})
+	}
+	log.Printf("🎬 Test tenant: %s / demo123", email)
+}
+
+// ensureCore adds core module keys.
+func ensureCore(mods []string) []string {
+	set := map[string]bool{}
+	for _, m := range mods {
+		set[m] = true
+	}
+	for _, d := range models.ModuleCatalog() {
+		if d.Core {
+			set[d.Key] = true
+		}
+	}
+	out := []string{}
+	for _, d := range models.ModuleCatalog() {
+		if set[d.Key] {
+			out = append(out, d.Key)
+		}
+	}
+	return out
+}
+
+// priceOf sums non-core module prices (mirrors api.ComputeSubscription).
+func priceOf(mods []string) float64 {
+	set := map[string]bool{}
+	for _, m := range mods {
+		set[m] = true
+	}
+	var total float64
+	for _, d := range models.ModuleCatalog() {
+		if !d.Core && set[d.Key] {
+			total += d.Price
+		}
+	}
+	return total
 }
 
 func populate(db *gorm.DB) error {

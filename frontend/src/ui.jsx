@@ -32,6 +32,21 @@ export function ToastProvider({ children }) {
   )
 }
 
+// ---------------- Logo ----------------
+// Prefers a bundled /logo.webp; falls back to the OAWO CDN, then a wordmark.
+const LOGO_LOCAL = '/logo.webp'
+const LOGO_REMOTE = 'https://oawo.com/files/66_40135085-ac6e-4575-88a9-ab2e1370e6b2.webp'
+export function Logo({ className = 'h-8 w-8' }) {
+  const [step, setStep] = useState(0) // 0=local, 1=remote, 2=wordmark
+  if (step < 2) {
+    return (
+      <img src={step === 0 ? LOGO_LOCAL : LOGO_REMOTE} alt="OAWO"
+        className={`${className} rounded-lg object-contain`} onError={() => setStep(step + 1)} />
+    )
+  }
+  return <div className={`grid ${className} place-items-center rounded-lg bg-gradient-to-br from-brand to-brand2 text-sm font-extrabold text-white`}>O</div>
+}
+
 // ---------------- Spinner ----------------
 export function Spinner() {
   return <div className="mx-auto my-10 h-7 w-7 animate-spin rounded-full border-[3px] border-line border-t-brand" />
@@ -61,7 +76,7 @@ export function Badge({ status }) {
     paid: ['Ödənilib', 'bg-brand/20 text-brand'],
     void: ['Ləğv', 'bg-danger/15 text-danger'],
   }
-  const [label, cls] = map[status] || [status, 'bg-surface2 text-slate-400']
+  const [label, cls] = map[status] || [status, 'bg-surface2 text-muted']
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
 }
 
@@ -73,7 +88,7 @@ export function Modal({ title, onClose, children, footer, wide }) {
       <div className={`mt-10 w-full ${wide ? 'max-w-4xl' : 'max-w-2xl'} rounded-2xl border border-line bg-surface shadow-2xl`}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h3 className="text-base font-semibold">{title}</h3>
-          <button className="text-2xl leading-none text-slate-400 hover:text-slate-100" onClick={onClose}>&times;</button>
+          <button className="text-2xl leading-none text-muted hover:text-text" onClick={onClose}>&times;</button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto p-5">{children}</div>
         {footer && <div className="flex justify-end gap-2.5 border-t border-line px-5 py-3.5">{footer}</div>}
@@ -128,7 +143,7 @@ export function Table({ title, actions, columns, rows, onRow, empty = 'Məlumat 
         </div>
       )}
       {rows.length === 0 ? (
-        <div className="py-12 text-center text-slate-400">{empty}</div>
+        <div className="py-12 text-center text-muted">{empty}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
