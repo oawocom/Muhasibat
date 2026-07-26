@@ -12,6 +12,7 @@ import (
 
 	"oawo-muhasibat/internal/api"
 	"oawo-muhasibat/internal/store"
+	"oawo-muhasibat/internal/tenant"
 )
 
 //go:embed all:web
@@ -20,7 +21,13 @@ var webFS embed.FS
 func main() {
 	db, err := store.Connect()
 	if err != nil {
-		log.Fatalf("Verilənlər bazasına qoşulmaq mümkün olmadı: %v", err)
+		log.Fatalf("Platform bazasına qoşulmaq mümkün olmadı: %v", err)
+	}
+
+	// Per-company database manager + first-boot bootstrap (superadmin + default company).
+	mgr := tenant.NewManager(db, tenant.ConfigFromEnv())
+	if err := store.Bootstrap(db, mgr); err != nil {
+		log.Fatalf("Bootstrap xətası: %v", err)
 	}
 
 	if os.Getenv("GIN_MODE") == "" {
@@ -42,7 +49,7 @@ func main() {
 
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok", "product": "oawo-muhasibat"}) })
 
-	server := api.New(db)
+	server := api.New(db, mgr)
 	server.RegisterRoutes(r)
 
 	// Serve the embedded SPA.

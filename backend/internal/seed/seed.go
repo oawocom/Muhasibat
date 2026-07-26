@@ -1,24 +1,26 @@
 package seed
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"oawo-muhasibat/internal/models"
 )
 
-// Run seeds a fresh database once (guarded by a Setting flag).
-func Run(db *gorm.DB) error {
+// SeedTenant seeds a fresh company database once (guarded by a Setting flag):
+// chart of accounts, currencies, tax rates, default warehouse, numbering
+// sequences and the enabled-modules list.
+func SeedTenant(db *gorm.DB) error {
 	var flag models.Setting
 	if err := db.Where("key = ?", "seeded").First(&flag).Error; err == nil && flag.Value == "1" {
 		return nil // already seeded
 	}
 
-	log.Println("🌱 Seeding OAWO Mühasibat başlanğıc məlumatları...")
+	log.Println("🌱 Tenant başlanğıc məlumatları seed olunur...")
 	if err := seedCurrencies(db); err != nil {
 		return err
 	}
@@ -34,14 +36,12 @@ func Run(db *gorm.DB) error {
 	if err := seedSequences(db); err != nil {
 		return err
 	}
-	if err := seedAdmin(db); err != nil {
-		return err
-	}
 
+	modules, _ := json.Marshal(models.DefaultEnabledModules())
 	db.Save(&models.Setting{Key: "seeded", Value: "1", UpdatedAt: time.Now()})
-	db.Save(&models.Setting{Key: "company_name", Value: envOr("COMPANY_NAME", "OAWO MMC"), UpdatedAt: time.Now()})
 	db.Save(&models.Setting{Key: "base_currency", Value: "AZN", UpdatedAt: time.Now()})
-	log.Println("✅ Seed tamamlandı.")
+	db.Save(&models.Setting{Key: "enabled_modules", Value: string(modules), UpdatedAt: time.Now()})
+	log.Println("✅ Tenant seed tamamlandı.")
 	return nil
 }
 
@@ -188,24 +188,6 @@ func seedSequences(db *gorm.DB) error {
 		}
 	}
 	return nil
-}
-
-func seedAdmin(db *gorm.DB) error {
-	var n int64
-	db.Model(&models.User{}).Count(&n)
-	if n > 0 {
-		return nil
-	}
-	email := envOr("ADMIN_EMAIL", "admin@oawo.com")
-	pass := envOr("ADMIN_PASSWORD", "admin123")
-	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	return db.Create(&models.User{
-		Email: email, Name: "Administrator", Password: string(hash),
-		Role: "admin", Enabled: true,
-	}).Error
 }
 
 func envOr(key, def string) string {

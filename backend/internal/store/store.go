@@ -6,31 +6,26 @@ import (
 	"os"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
 	"oawo-muhasibat/internal/models"
-	"oawo-muhasibat/internal/seed"
+	"oawo-muhasibat/internal/tenant"
 )
 
-// Connect opens the PostgreSQL connection, auto-migrates and seeds.
+// Connect opens the platform (control-plane) database and migrates the
+// platform models (companies, users, memberships).
 func Connect() (*gorm.DB, error) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		host := envOr("DB_HOST", "localhost")
-		port := envOr("DB_PORT", "5432")
-		user := envOr("DB_USER", "oawo")
-		pass := envOr("DB_PASSWORD", "oawo")
-		name := envOr("DB_NAME", "oawo_muhasibat")
-		ssl := envOr("DB_SSLMODE", "disable")
-		dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=Asia/Baku",
-			host, port, user, pass, name, ssl)
+		cfg := tenant.ConfigFromEnv()
+		dsn = cfg.DSN(envOr("DB_NAME", "oawo_muhasibat"))
 	}
 
 	var db *gorm.DB
 	var err error
-	// Retry — the DB container may still be starting.
 	for i := 0; i < 20; i++ {
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
 			Logger: logger.Default.LogMode(logger.Warn),
@@ -44,16 +39,54 @@ func Connect() (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if err := db.AutoMigrate(models.AllModels()...); err != nil {
-		return nil, fmt.Errorf("migrate: %w", err)
+	if err := db.AutoMigrate(models.PlatformModels()...); err != nil {
+		return nil, fmt.Errorf("platform migrate: %w", err)
 	}
-	if err := seed.Run(db); err != nil {
-		return nil, fmt.Errorf("seed: %w", err)
-	}
-	log.Println("✅ Verilənlər bazası hazırdır.")
+	log.Println("✅ Platform bazası hazırdır.")
 	return db, nil
 }
+
+// Bootstrap ensures a superadmin user exists and, on first boot, creates a
+// default company (provisioning its tenant database) so the app is usable
+// immediately.
+func Bootstrap(db *gorm.DB, mgr *tenant.Manager) error {
+	// Superadmin.
+	var admin models.User
+	err := db.Where("email = ?", adminEmail()).First(&admin).Error
+	if err != nil {
+		hash, _ := bcrypt.GenerateFromPassword([]byte(adminPassword()), bcrypt.DefaultCost)
+		admin = models.User{
+			Email: adminEmail(), Name: "Administrator", Password: string(hash),
+			IsSuperadmin: true, Enabled: true,
+		}
+		if err := db.Create(&admin).Error; err != nil {
+			return fmt.Errorf("superadmin: %w", err)
+		}
+		log.Printf("👤 Superadmin yaradıldı: %s", admin.Email)
+	}
+
+	// Default company on first boot.
+	var count int64
+	db.Model(&models.Company{}).Count(&count)
+	if count == 0 {
+		company := models.Company{Name: envOr("COMPANY_NAME", "OAWO MMC"), Enabled: true}
+		if err := db.Create(&company).Error; err != nil {
+			return fmt.Errorf("default company: %w", err)
+		}
+		company.DBName = tenant.DBNameFor(company.ID)
+		db.Save(&company)
+		if _, err := mgr.Provision(company.ID, company.DBName); err != nil {
+			return fmt.Errorf("provision default company: %w", err)
+		}
+		db.Model(&models.Company{}).Where("id = ?", company.ID).Update("provisioned", true)
+		db.Create(&models.Membership{UserID: admin.ID, CompanyID: company.ID, Role: models.RoleOwner, Enabled: true})
+		log.Printf("🏢 Default şirkət yaradıldı: %s", company.Name)
+	}
+	return nil
+}
+
+func adminEmail() string    { return envOr("ADMIN_EMAIL", "admin@oawo.com") }
+func adminPassword() string { return envOr("ADMIN_PASSWORD", "admin123") }
 
 func envOr(key, def string) string {
 	if v := os.Getenv(key); v != "" {

@@ -204,23 +204,12 @@ type Setting struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// User — simple auth for the standalone product.
-type User struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	Email     string    `json:"email" gorm:"size:255;uniqueIndex;not null"`
-	Name      string    `json:"name" gorm:"size:255"`
-	Password  string    `json:"-" gorm:"size:255"`
-	Role      string    `json:"role" gorm:"size:32;default:admin"`
-	Enabled   bool      `json:"enabled" gorm:"default:true"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// AllModels returns every model for auto-migration.
-func AllModels() []interface{} {
+// TenantModels returns every accounting model — migrated into each
+// company's own database. (Users live in the platform DB, not here.)
+func TenantModels() []interface{} {
 	return []interface{}{
 		&Currency{}, &Account{}, &Partner{}, &TaxRate{}, &Warehouse{},
 		&Product{}, &StockMove{}, &JournalEntry{}, &JournalLine{},
-		&Document{}, &DocumentLine{}, &Sequence{}, &Setting{}, &User{},
+		&Document{}, &DocumentLine{}, &Sequence{}, &Setting{},
 	}
 }

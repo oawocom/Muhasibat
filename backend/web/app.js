@@ -5,11 +5,15 @@
   // ---------------- API ----------------
   var TOKEN = localStorage.getItem('oawo_token') || '';
   var USER = null;
+  var COMPANIES = [];                 // companies the user can access
+  var COMPANY = null;                 // active {id, name, role, ...}
+  var ENABLED_MODULES = null;         // array of enabled module keys for active company
   var CACHE = {}; // reference data cache
 
   function api(method, path, body) {
     var opts = { method: method, headers: { 'Content-Type': 'application/json' } };
     if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+    if (COMPANY) opts.headers['X-Company-ID'] = String(COMPANY.id);
     if (body !== undefined) opts.body = JSON.stringify(body);
     return fetch('/api' + path, opts).then(function (r) {
       if (r.status === 401) { logout(); throw new Error('Sessiya bitib'); }
@@ -20,6 +24,8 @@
       });
     });
   }
+  function canWrite() { return COMPANY && COMPANY.role !== 'viewer'; }
+  function canManage() { return COMPANY && (COMPANY.role === 'owner' || COMPANY.role === 'admin'); }
   var GET = function (p) { return api('GET', p); };
   var POST = function (p, b) { return api('POST', p, b); };
   var PUT = function (p, b) { return api('PUT', p, b); };
@@ -130,32 +136,44 @@
   }
 
   // ---------------- navigation ----------------
+  // mod = module key gating visibility; manage = only owner/admin.
   var NAV = [
     { g: 'Əsas' },
-    { id: 'dashboard', t: 'İdarə paneli', ic: '▚' },
-    { id: 'journal', t: 'Mühasibat jurnalı', ic: '≣' },
+    { id: 'dashboard', t: 'İdarə paneli', ic: '▚', mod: 'dashboard' },
+    { id: 'journal', t: 'Mühasibat jurnalı', ic: '≣', mod: 'journal' },
     { g: 'Ticarət' },
-    { id: 'sales', t: 'Satış fakturaları', ic: '↗' },
-    { id: 'purchases', t: 'Alış fakturaları', ic: '↙' },
-    { id: 'money', t: 'Kassa / Bank', ic: '₼' },
+    { id: 'sales', t: 'Satış fakturaları', ic: '↗', mod: 'sales' },
+    { id: 'purchases', t: 'Alış fakturaları', ic: '↙', mod: 'purchases' },
+    { id: 'money', t: 'Kassa / Bank', ic: '₼', mod: 'money' },
     { g: 'Kataloq' },
-    { id: 'partners', t: 'Tərəfdaşlar', ic: '☺' },
-    { id: 'products', t: 'Məhsul / Xidmət', ic: '▤' },
-    { id: 'accounts', t: 'Hesablar planı', ic: '❏' },
+    { id: 'partners', t: 'Tərəfdaşlar', ic: '☺', mod: 'partners' },
+    { id: 'products', t: 'Məhsul / Xidmət', ic: '▤', mod: 'products' },
+    { id: 'accounts', t: 'Hesablar planı', ic: '❏', mod: 'accounts' },
     { g: 'Hesabatlar' },
-    { id: 'trial', t: 'Dövriyyə balansı', ic: '∑' },
-    { id: 'balance', t: 'Balans hesabatı', ic: '⚖' },
-    { id: 'pl', t: 'Mənfəət və zərər', ic: '📈' },
-    { id: 'partnerbal', t: 'Debitor / Kreditor', ic: '⇄' },
-    { id: 'stock', t: 'Anbar qalıqları', ic: '▦' },
-    { g: 'Sistem' },
-    { id: 'settings', t: 'Parametrlər', ic: '⚙' }
+    { id: 'trial', t: 'Dövriyyə balansı', ic: '∑', mod: 'reports' },
+    { id: 'balance', t: 'Balans hesabatı', ic: '⚖', mod: 'reports' },
+    { id: 'pl', t: 'Mənfəət və zərər', ic: '📈', mod: 'reports' },
+    { id: 'partnerbal', t: 'Debitor / Kreditor', ic: '⇄', mod: 'reports' },
+    { id: 'stock', t: 'Anbar qalıqları', ic: '▦', mod: 'inventory' },
+    { g: 'Şirkət' },
+    { id: 'companies', t: 'Şirkətlər', ic: '🏢', manage: true },
+    { id: 'users', t: 'İstifadəçilər', ic: '👥', manage: true },
+    { id: 'settings', t: 'Parametrlər', ic: '⚙', mod: 'settings' }
   ];
+
+  function navVisible(n) {
+    if (n.manage) return canManage();
+    if (n.mod && ENABLED_MODULES && ENABLED_MODULES.indexOf(n.mod) === -1) return false;
+    return true;
+  }
 
   function renderNav() {
     var nav = $('#nav'); nav.innerHTML = '';
+    var pendingGroup = null;
     NAV.forEach(function (n) {
-      if (n.g) { nav.appendChild(el('<div class="lbl">' + esc(n.g) + '</div>')); return; }
+      if (n.g) { pendingGroup = n.g; return; }
+      if (!navVisible(n)) return;
+      if (pendingGroup) { nav.appendChild(el('<div class="lbl">' + esc(pendingGroup) + '</div>')); pendingGroup = null; }
       var a = el('<a href="#' + n.id + '" class="nav-item" data-id="' + n.id + '"><span class="ic">' + n.ic + '</span>' + esc(n.t) + '</a>');
       nav.appendChild(a);
     });
@@ -728,17 +746,109 @@
   };
 
   // ---- Settings ----
-  ROUTES.settings = function () {
-    return Promise.all([GET('/settings'), GET('/currencies'), GET('/tax-rates'), GET('/warehouses')]).then(function (r) {
-      var st = r[0], curr = r[1], tax = r[2], wh = r[3];
+  // ---- Companies (management) ----
+  ROUTES.companies = function () {
+    return Promise.all([refreshCompanies(), GET('/module-catalog')]).then(function () {
+      var cols = [
+        { h: 'Şirkət', render: function (r) { return '<b>' + esc(r.name) + '</b>' + (COMPANY && r.id === COMPANY.id ? ' <span class="chip">aktiv</span>' : ''); } },
+        { h: 'VÖEN', k: 'tax_id', cls: 'mono' },
+        { h: 'Rolunuz', render: function (r) { return esc(roleLabel(r.role)); } },
+        { h: '', cls: 'right', render: function (r) {
+          var w = el('<div class="tools" style="justify-content:flex-end"></div>');
+          w.appendChild(iconBtn('Keç', 'ghost', function () { setActiveCompany(r); bootCompany(); ok('Aktiv şirkət: ' + r.name); }));
+          if (r.role === 'owner' || r.role === 'admin') w.appendChild(iconBtn('Düzəliş', 'ghost', function () {
+            simpleEditPlatform('/companies/' + r.id, [{ k: 'name', label: 'Ad' }, { k: 'tax_id', label: 'VÖEN' }], r, 'Şirkət');
+          }));
+          return w;
+        } }
+      ];
+      setActions([iconBtn('+ Yeni şirkət', 'primary', function () { createCompanyForm(); })]);
+      view(tablePanel('Şirkətlər (' + COMPANIES.length + ')', cols, COMPANIES));
+    });
+  };
+
+  // ---- Users of the active company ----
+  ROUTES.users = function () {
+    if (!COMPANY) { view(el('<div class="empty">Şirkət seçilməyib</div>')); return Promise.resolve(); }
+    return Promise.all([GET('/companies/' + COMPANY.id + '/users'), GET('/roles')]).then(function (r) {
+      var users = r[0], roles = r[1];
+      var roleOpts = roles.map(function (x) { return { value: x.key, label: x.label }; });
+      var cols = [
+        { h: 'Ad', render: function (u) { return '<b>' + esc(u.name || '—') + '</b>'; } },
+        { h: 'Email', k: 'email' },
+        { h: 'Rol', render: function (u) { return esc(roleLabel(u.role)); } },
+        { h: '', cls: 'right', render: function (u) {
+          var w = el('<div class="tools" style="justify-content:flex-end"></div>');
+          w.appendChild(iconBtn('Rol', 'ghost', function () {
+            var f = form([{ k: 'role', label: 'Rol', type: 'select', options: roleOpts, value: u.role }], {});
+            var foot = el('<div></div>'); var s = el('<button class="btn primary">Yadda saxla</button>'); foot.appendChild(s);
+            var mo = modal('Rolu dəyiş — ' + (u.name || u.email), f.node, foot);
+            s.onclick = function () { PUT('/companies/' + COMPANY.id + '/users/' + u.id, f.collect()).then(function () { mo.close(); ok('Yeniləndi'); route(); }).catch(function (e) { err(e.message); }); };
+          }));
+          w.appendChild(iconBtn('Sil', 'danger', function () { confirmDo('İstifadəçi şirkətdən çıxarılsın?', function () { DEL('/companies/' + COMPANY.id + '/users/' + u.id).then(function () { ok('Silindi'); route(); }).catch(function (e) { err(e.message); }); }); }));
+          return w;
+        } }
+      ];
+      setActions([iconBtn('+ İstifadəçi əlavə et', 'primary', function () {
+        var f = form([
+          { k: 'email', label: 'Email', required: true },
+          { k: 'name', label: 'Ad' },
+          { k: 'role', label: 'Rol', type: 'select', options: roleOpts, value: 'accountant' },
+          { k: 'password', label: 'Şifrə (yeni istifadəçi üçün, min 6)', type: 'password' }
+        ], {});
+        var foot = el('<div></div>'); var s = el('<button class="btn primary">Əlavə et</button>'); foot.appendChild(s);
+        var mo = modal('İstifadəçi əlavə et', f.node, foot);
+        s.onclick = function () {
+          var d = f.collect();
+          if (!d.email || !d.role) { err('Email və rol tələb olunur'); return; }
+          POST('/companies/' + COMPANY.id + '/users', d).then(function () { mo.close(); ok('Əlavə olundu'); route(); }).catch(function (e) { err(e.message); });
+        };
+      })]);
       var wrap = el('<div></div>');
-      // company
-      var cf = form([{ k: 'company_name', label: 'Şirkət adı', value: st.company_name || '' }], {});
-      var cp = el('<div class="panel"><div class="head"><h3>Şirkət</h3></div><div class="body" style="padding:18px"></div></div>');
-      $('.body', cp).appendChild(cf.node);
-      var cbtn = el('<button class="btn primary">Yadda saxla</button>'); $('.body', cp).appendChild(cbtn);
-      cbtn.onclick = function () { PUT('/settings', cf.collect()).then(function () { ok('Yadda saxlanıldı'); }).catch(function (e) { err(e.message); }); };
-      wrap.appendChild(cp);
+      wrap.appendChild(el('<div class="card" style="margin-bottom:16px"><b>' + esc(COMPANY.name) + '</b> <span class="muted">— bu şirkətin istifadəçiləri və rolları</span></div>'));
+      wrap.appendChild(tablePanel('İstifadəçilər (' + users.length + ')', cols, users));
+      view(wrap);
+    });
+  };
+
+  function simpleEditPlatform(path, fields, values, title) {
+    var f = form(fields, values || {});
+    var foot = el('<div></div>'); var save = el('<button class="btn primary">Yadda saxla</button>'); foot.appendChild(save);
+    var mo = modal(title, f.node, foot);
+    save.onclick = function () {
+      PUT(path, f.collect()).then(function () { mo.close(); ok('Yadda saxlanıldı'); refreshCompanies().then(route); }).catch(function (e) { err(e.message); });
+    };
+  }
+
+  ROUTES.settings = function () {
+    return Promise.all([GET('/settings'), GET('/currencies'), GET('/tax-rates'), GET('/warehouses'), GET('/module-catalog')]).then(function (r) {
+      var st = r[0], curr = r[1], tax = r[2], wh = r[3], catalog = r[4];
+      var wrap = el('<div></div>');
+      // ---- module selection ----
+      var enabled = [];
+      try { enabled = JSON.parse(st.enabled_modules || '[]'); } catch (e) { enabled = []; }
+      var mp = el('<div class="panel"><div class="head"><h3>Modul seçimi</h3></div><div class="body" style="padding:18px"></div></div>');
+      var grid = el('<div class="grid3"></div>');
+      var checks = {};
+      catalog.forEach(function (m) {
+        var on = m.core || enabled.indexOf(m.key) !== -1;
+        var lab = el('<label class="f" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:2px"></label>');
+        var cb = el('<input type="checkbox" style="width:auto">'); cb.checked = on; if (m.core) cb.disabled = true;
+        checks[m.key] = cb;
+        lab.appendChild(cb);
+        lab.appendChild(el('<span>' + esc(m.label) + (m.core ? ' <span class="chip">əsas</span>' : '') + '</span>'));
+        grid.appendChild(lab);
+      });
+      $('.body', mp).appendChild(grid);
+      var mbtn = el('<button class="btn primary" style="margin-top:14px">Modulları yadda saxla</button>');
+      $('.body', mp).appendChild(mbtn);
+      mbtn.onclick = function () {
+        var sel = catalog.filter(function (m) { return m.core || checks[m.key].checked; }).map(function (m) { return m.key; });
+        PUT('/settings', { enabled_modules: JSON.stringify(sel) }).then(function () {
+          ENABLED_MODULES = sel; renderNav(); ok('Modullar yeniləndi');
+        }).catch(function (e) { err(e.message); });
+      };
+      if (canManage()) wrap.appendChild(mp);
       // currencies
       var ccols = [{ h: 'Kod', k: 'code', cls: 'mono' }, { h: 'Ad', k: 'name' }, { h: 'Məzənnə', cls: 'right mono', render: function (r) { return r.is_base ? 'Baza' : money(r.rate); } }, { h: '', cls: 'right', render: function (r) { return r.is_base ? '' : iconBtn('Düzəliş', 'ghost', function () { simpleEdit('/currencies/' + r.id, [{ k: 'rate', label: 'Məzənnə', type: 'number', step: '0.000001' }], r, 'Valyuta məzənnəsi'); }); } }];
       wrap.appendChild(tablePanel('Valyutalar', ccols, curr, { actions: [iconBtn('+ Valyuta', 'ghost', function () { simpleEdit('/currencies', [{ k: 'code', label: 'Kod' }, { k: 'name', label: 'Ad' }, { k: 'symbol', label: 'Simvol' }, { k: 'rate', label: 'Məzənnə', type: 'number', step: '0.000001' }], { rate: 1, enabled: true }, 'Yeni valyuta'); })] }));
@@ -770,32 +880,111 @@
     };
   }
 
+  // ---------------- company selection ----------------
+  function setActiveCompany(cmp) {
+    COMPANY = cmp;
+    ENABLED_MODULES = null;
+    try { localStorage.setItem('oawo_company', String(cmp.id)); } catch (e) {}
+  }
+
+  // Load reference data + enabled modules for the active company, then render.
+  function bootCompany() {
+    $('#companyName').textContent = COMPANY ? COMPANY.name : '';
+    $('#companyRole').textContent = roleLabel(COMPANY && COMPANY.role);
+    $('#view').innerHTML = '<div class="spin"></div>';
+    return Promise.all([loadRefs(), GET('/settings')]).then(function (res) {
+      var st = res[1] || {};
+      try { ENABLED_MODULES = JSON.parse(st.enabled_modules || 'null'); } catch (e) { ENABLED_MODULES = null; }
+      renderNav();
+      if (!location.hash) location.hash = 'dashboard';
+      route();
+    }).catch(function (e) { err(e.message); });
+  }
+  function roleLabel(r) {
+    return { owner: 'Sahib', admin: 'Admin', accountant: 'Mühasib', warehouse: 'Anbardar', viewer: 'Baxış' }[r] || r || '';
+  }
+
+  // Company picker modal (when user has >1 company or wants to switch).
+  function pickCompany(force) {
+    var body = el('<div></div>');
+    if (!COMPANIES.length) {
+      body.appendChild(el('<p class="muted">Hələ şirkətiniz yoxdur. Yeni şirkət yaradın.</p>'));
+    } else {
+      COMPANIES.forEach(function (cmp) {
+        var row = el('<button class="btn" style="width:100%;justify-content:space-between;margin-bottom:8px"><span><b>' + esc(cmp.name) + '</b> <span class="muted">' + esc(roleLabel(cmp.role)) + '</span></span><span>›</span></button>');
+        row.onclick = function () { setActiveCompany(cmp); mo.close(); bootCompany(); };
+        body.appendChild(row);
+      });
+    }
+    var create = el('<button class="btn primary" style="width:100%;margin-top:6px">+ Yeni şirkət yarat</button>');
+    create.onclick = function () { mo.close(); createCompanyForm(); };
+    body.appendChild(create);
+    var mo = modal('Şirkət seçin', body, null);
+    if (force) { mo.node.parentNode.onclick = null; $('.x', mo.node).style.display = 'none'; }
+  }
+
+  function createCompanyForm() {
+    var f = form([
+      { k: 'name', label: 'Şirkət adı', required: true },
+      { k: 'tax_id', label: 'VÖEN' }
+    ], {});
+    var foot = el('<div></div>'); var save = el('<button class="btn primary">Yarat</button>'); foot.appendChild(save);
+    var mo = modal('Yeni şirkət', f.node, foot);
+    save.onclick = function () {
+      var d = f.collect();
+      if (!d.name) { err('Ad tələb olunur'); return; }
+      save.disabled = true; save.textContent = 'Yaradılır...';
+      POST('/companies', d).then(function (cmp) {
+        ok('Şirkət yaradıldı');
+        return refreshCompanies().then(function () {
+          var found = COMPANIES.filter(function (x) { return x.id === cmp.id; })[0] || cmp;
+          setActiveCompany(found); mo.close(); bootCompany();
+        });
+      }).catch(function (e) { err(e.message); save.disabled = false; save.textContent = 'Yarat'; });
+    };
+  }
+
+  function refreshCompanies() {
+    return GET('/companies').then(function (list) { COMPANIES = list || []; return COMPANIES; });
+  }
+
   // ---------------- auth / boot ----------------
-  function showApp() {
+  function afterAuth() {
     $('#login').classList.add('hidden');
     $('#app').classList.remove('hidden');
     $('#userName').textContent = USER ? USER.name || USER.email : '';
-    renderNav();
     if (window.innerWidth < 860) $('#menuBtn').style.display = '';
-    loadRefs().then(route);
+    // Restore last active company if still accessible.
+    var savedId = null;
+    try { savedId = Number(localStorage.getItem('oawo_company')); } catch (e) {}
+    var match = COMPANIES.filter(function (c) { return c.id === savedId; })[0];
+    if (match) { setActiveCompany(match); return bootCompany(); }
+    if (COMPANIES.length === 1) { setActiveCompany(COMPANIES[0]); return bootCompany(); }
+    if (COMPANIES.length === 0) { renderNav(); createCompanyForm(); return; }
+    renderNav(); pickCompany(true);
   }
   function logout() {
-    TOKEN = ''; localStorage.removeItem('oawo_token');
+    TOKEN = ''; COMPANY = null; COMPANIES = []; ENABLED_MODULES = null;
+    localStorage.removeItem('oawo_token');
     $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
   }
+
+  // loadRefs is called per-route from tenant views; expose company switch.
+  window.__oawoSwitchCompany = function () { refreshCompanies().then(function () { pickCompany(false); }); };
 
   $('#loginForm').addEventListener('submit', function (e) {
     e.preventDefault();
     POST('/auth/login', { email: $('#li_email').value, password: $('#li_pass').value })
-      .then(function (r) { TOKEN = r.token; USER = r.user; localStorage.setItem('oawo_token', TOKEN); ok('Xoş gəlmisiniz!'); showApp(); })
+      .then(function (r) { TOKEN = r.token; USER = r.user; COMPANIES = r.companies || []; localStorage.setItem('oawo_token', TOKEN); ok('Xoş gəlmisiniz!'); afterAuth(); })
       .catch(function (e) { err(e.message); });
   });
   $('#logout').addEventListener('click', function (e) { e.preventDefault(); logout(); });
   $('#menuBtn').addEventListener('click', function () { $('#sidebar').classList.toggle('open'); });
-  window.addEventListener('hashchange', route);
+  $('#companySwitch').addEventListener('click', function (e) { e.preventDefault(); window.__oawoSwitchCompany(); });
+  window.addEventListener('hashchange', function () { if (COMPANY) route(); });
 
   // auto-login if token exists
   if (TOKEN) {
-    GET('/auth/me').then(function (u) { USER = u; showApp(); }).catch(function () { logout(); });
+    GET('/auth/me').then(function (r) { USER = r.user; COMPANIES = r.companies || []; afterAuth(); }).catch(function () { logout(); });
   }
 })();

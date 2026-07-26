@@ -20,10 +20,22 @@ yoxdur — tək başına işə düşür və müştərilərə ayrıca lisenziya k
   Debitor/Kreditor, Anbar qalıqları.
 - **Müasir veb interfeys** — quraşdırma tələb etmir, brauzerdən işləyir.
 
+## Çox şirkətlilik (Multi-tenant)
+
+Sistem **çox şirkətli**dir — bir quraşdırma çox müştəriyə xidmət edir:
+
+- **Şirkət başına ayrı verilənlər bazası** (`oawo_company_<id>`) — tam izolyasiya.
+- **Qlobal istifadəçilər + üzvlük + rollar:** Sahib, Admin, Mühasib, Anbardar, Baxış (yalnız oxu).
+- **Şirkət seçici** — bir istifadəçi bir neçə şirkətə üzv ola və aralarında keçid edə bilər.
+- **Tenant başına modul seçimi** — hər şirkət öz aktiv modullarını (satış, alış, anbar, kassa…) Parametrlərdən idarə edir.
+- Yeni şirkət yaradan istifadəçi avtomatik **sahib** olur; şirkətin bazası (hesablar planı ilə) avtomatik hazırlanır.
+
+Rol icazələri backend-də məcburidir: `Baxış` yalnız oxuyur, üzv olmadığın şirkətə giriş bloklanır.
+
 ## Sürətli başlanğıc (Docker)
 
 ```bash
-cd oawo-muhasibat
+cd oawo-muhasibat   # və ya klonladığınız qovluq
 docker compose up -d --build
 ```
 

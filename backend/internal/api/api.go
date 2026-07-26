@@ -10,13 +10,22 @@ import (
 
 	"oawo-muhasibat/internal/engine"
 	"oawo-muhasibat/internal/models"
+	"oawo-muhasibat/internal/tenant"
 )
 
 type Server struct {
-	DB *gorm.DB
+	DB  *gorm.DB        // platform (control-plane) database
+	Mgr *tenant.Manager // per-company database manager
 }
 
-func New(db *gorm.DB) *Server { return &Server{DB: db} }
+func New(db *gorm.DB, mgr *tenant.Manager) *Server {
+	return &Server{DB: db, Mgr: mgr}
+}
+
+// ModuleCatalogHandler returns the fixed catalog of toggleable modules.
+func (s *Server) ModuleCatalogHandler(c *gin.Context) {
+	c.JSON(200, models.ModuleCatalog())
+}
 
 // RegisterRoutes wires the full REST API under /api.
 func (s *Server) RegisterRoutes(r *gin.Engine) {
@@ -24,80 +33,97 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 
 	api.POST("/auth/login", s.Login)
 
+	// Platform-scoped (authenticated, no company context required).
 	auth := api.Group("")
 	auth.Use(s.AuthMiddleware())
 	{
 		auth.GET("/auth/me", s.Me)
 		auth.POST("/auth/change-password", s.ChangePassword)
+		auth.GET("/module-catalog", s.ModuleCatalogHandler)
+		auth.GET("/roles", s.Roles)
 
+		// Companies & members (control-plane)
+		auth.GET("/companies", s.ListCompanies)
+		auth.POST("/companies", s.CreateCompany)
+		auth.PUT("/companies/:id", s.UpdateCompany)
+		auth.GET("/companies/:id/users", s.ListCompanyUsers)
+		auth.POST("/companies/:id/users", s.AddCompanyUser)
+		auth.PUT("/companies/:id/users/:mid", s.UpdateCompanyUser)
+		auth.DELETE("/companies/:id/users/:mid", s.RemoveCompanyUser)
+	}
+
+	// Tenant-scoped (authenticated + active company via X-Company-ID).
+	t := api.Group("")
+	t.Use(s.AuthMiddleware(), s.TenantMiddleware())
+	{
 		// Chart of accounts
-		auth.GET("/accounts", s.ListAccounts)
-		auth.GET("/accounts/:id", s.GetAccount)
-		auth.POST("/accounts", s.CreateAccount)
-		auth.PUT("/accounts/:id", s.UpdateAccount)
-		auth.DELETE("/accounts/:id", s.DeleteAccount)
+		t.GET("/accounts", s.ListAccounts)
+		t.GET("/accounts/:id", s.GetAccount)
+		t.POST("/accounts", s.CreateAccount)
+		t.PUT("/accounts/:id", s.UpdateAccount)
+		t.DELETE("/accounts/:id", s.DeleteAccount)
 
 		// Currencies
-		auth.GET("/currencies", s.ListCurrencies)
-		auth.POST("/currencies", s.CreateCurrency)
-		auth.PUT("/currencies/:id", s.UpdateCurrency)
-		auth.DELETE("/currencies/:id", s.DeleteCurrency)
+		t.GET("/currencies", s.ListCurrencies)
+		t.POST("/currencies", s.CreateCurrency)
+		t.PUT("/currencies/:id", s.UpdateCurrency)
+		t.DELETE("/currencies/:id", s.DeleteCurrency)
 
 		// Tax rates
-		auth.GET("/tax-rates", s.ListTaxRates)
-		auth.POST("/tax-rates", s.CreateTaxRate)
-		auth.PUT("/tax-rates/:id", s.UpdateTaxRate)
-		auth.DELETE("/tax-rates/:id", s.DeleteTaxRate)
+		t.GET("/tax-rates", s.ListTaxRates)
+		t.POST("/tax-rates", s.CreateTaxRate)
+		t.PUT("/tax-rates/:id", s.UpdateTaxRate)
+		t.DELETE("/tax-rates/:id", s.DeleteTaxRate)
 
 		// Warehouses
-		auth.GET("/warehouses", s.ListWarehouses)
-		auth.POST("/warehouses", s.CreateWarehouse)
-		auth.PUT("/warehouses/:id", s.UpdateWarehouse)
-		auth.DELETE("/warehouses/:id", s.DeleteWarehouse)
+		t.GET("/warehouses", s.ListWarehouses)
+		t.POST("/warehouses", s.CreateWarehouse)
+		t.PUT("/warehouses/:id", s.UpdateWarehouse)
+		t.DELETE("/warehouses/:id", s.DeleteWarehouse)
 
 		// Partners
-		auth.GET("/partners", s.ListPartners)
-		auth.GET("/partners/:id", s.GetPartner)
-		auth.POST("/partners", s.CreatePartner)
-		auth.PUT("/partners/:id", s.UpdatePartner)
-		auth.DELETE("/partners/:id", s.DeletePartner)
+		t.GET("/partners", s.ListPartners)
+		t.GET("/partners/:id", s.GetPartner)
+		t.POST("/partners", s.CreatePartner)
+		t.PUT("/partners/:id", s.UpdatePartner)
+		t.DELETE("/partners/:id", s.DeletePartner)
 
 		// Products
-		auth.GET("/products", s.ListProducts)
-		auth.GET("/products/:id", s.GetProduct)
-		auth.POST("/products", s.CreateProduct)
-		auth.PUT("/products/:id", s.UpdateProduct)
-		auth.DELETE("/products/:id", s.DeleteProduct)
+		t.GET("/products", s.ListProducts)
+		t.GET("/products/:id", s.GetProduct)
+		t.POST("/products", s.CreateProduct)
+		t.PUT("/products/:id", s.UpdateProduct)
+		t.DELETE("/products/:id", s.DeleteProduct)
 
 		// Journal entries
-		auth.GET("/journal", s.ListJournal)
-		auth.GET("/journal/:id", s.GetJournal)
-		auth.POST("/journal", s.CreateJournal)
-		auth.PUT("/journal/:id", s.UpdateJournal)
-		auth.POST("/journal/:id/post", s.PostJournal)
-		auth.POST("/journal/:id/unpost", s.UnpostJournal)
-		auth.DELETE("/journal/:id", s.DeleteJournal)
+		t.GET("/journal", s.ListJournal)
+		t.GET("/journal/:id", s.GetJournal)
+		t.POST("/journal", s.CreateJournal)
+		t.PUT("/journal/:id", s.UpdateJournal)
+		t.POST("/journal/:id/post", s.PostJournal)
+		t.POST("/journal/:id/unpost", s.UnpostJournal)
+		t.DELETE("/journal/:id", s.DeleteJournal)
 
 		// Documents (invoices, payments, receipts)
-		auth.GET("/documents", s.ListDocuments)
-		auth.GET("/documents/:id", s.GetDocument)
-		auth.POST("/documents", s.CreateDocument)
-		auth.PUT("/documents/:id", s.UpdateDocument)
-		auth.POST("/documents/:id/post", s.PostDocument)
-		auth.DELETE("/documents/:id", s.DeleteDocument)
+		t.GET("/documents", s.ListDocuments)
+		t.GET("/documents/:id", s.GetDocument)
+		t.POST("/documents", s.CreateDocument)
+		t.PUT("/documents/:id", s.UpdateDocument)
+		t.POST("/documents/:id/post", s.PostDocument)
+		t.DELETE("/documents/:id", s.DeleteDocument)
 
 		// Reports
-		auth.GET("/reports/trial-balance", s.TrialBalance)
-		auth.GET("/reports/ledger/:accountId", s.Ledger)
-		auth.GET("/reports/balance-sheet", s.BalanceSheet)
-		auth.GET("/reports/profit-loss", s.ProfitLoss)
-		auth.GET("/reports/partner-balances", s.PartnerBalancesReport)
-		auth.GET("/reports/stock", s.StockReport)
-		auth.GET("/dashboard", s.DashboardHandler)
+		t.GET("/reports/trial-balance", s.TrialBalance)
+		t.GET("/reports/ledger/:accountId", s.Ledger)
+		t.GET("/reports/balance-sheet", s.BalanceSheet)
+		t.GET("/reports/profit-loss", s.ProfitLoss)
+		t.GET("/reports/partner-balances", s.PartnerBalancesReport)
+		t.GET("/reports/stock", s.StockReport)
+		t.GET("/dashboard", s.DashboardHandler)
 
-		// Settings
-		auth.GET("/settings", s.GetSettings)
-		auth.PUT("/settings", s.UpdateSettings)
+		// Settings (includes enabled_modules)
+		t.GET("/settings", s.GetSettings)
+		t.PUT("/settings", s.UpdateSettings)
 	}
 }
 
@@ -137,7 +163,7 @@ func endOfDay(t *time.Time) *time.Time {
 
 func (s *Server) ListAccounts(c *gin.Context) {
 	var items []models.Account
-	q := s.DB.Order("code asc")
+	q := tdb(c).Order("code asc")
 	if t := c.Query("type"); t != "" {
 		q = q.Where("type = ?", t)
 	}
@@ -154,7 +180,7 @@ func (s *Server) GetAccount(c *gin.Context) {
 		return
 	}
 	var a models.Account
-	if err := s.DB.First(&a, id).Error; err != nil {
+	if err := tdb(c).First(&a, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Hesab tapılmadı"})
 		return
 	}
@@ -167,7 +193,7 @@ func (s *Server) CreateAccount(c *gin.Context) {
 		c.JSON(400, gin.H{"detail": "Yanlış məlumat"})
 		return
 	}
-	if err := s.DB.Create(&a).Error; err != nil {
+	if err := tdb(c).Create(&a).Error; err != nil {
 		c.JSON(500, gin.H{"detail": "Yaradıla bilmədi"})
 		return
 	}
@@ -180,7 +206,7 @@ func (s *Server) UpdateAccount(c *gin.Context) {
 		return
 	}
 	var a models.Account
-	if err := s.DB.First(&a, id).Error; err != nil {
+	if err := tdb(c).First(&a, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -189,8 +215,8 @@ func (s *Server) UpdateAccount(c *gin.Context) {
 	delete(updates, "id")
 	delete(updates, "created_at")
 	delete(updates, "system_key") // protect system accounts
-	s.DB.Model(&a).Updates(updates)
-	s.DB.First(&a, id)
+	tdb(c).Model(&a).Updates(updates)
+	tdb(c).First(&a, id)
 	c.JSON(200, a)
 }
 
@@ -200,7 +226,7 @@ func (s *Server) DeleteAccount(c *gin.Context) {
 		return
 	}
 	var a models.Account
-	if err := s.DB.First(&a, id).Error; err != nil {
+	if err := tdb(c).First(&a, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -209,12 +235,12 @@ func (s *Server) DeleteAccount(c *gin.Context) {
 		return
 	}
 	var used int64
-	s.DB.Model(&models.JournalLine{}).Where("account_id = ?", id).Count(&used)
+	tdb(c).Model(&models.JournalLine{}).Where("account_id = ?", id).Count(&used)
 	if used > 0 {
 		c.JSON(400, gin.H{"detail": "Bu hesabda yazılışlar var, silinə bilməz"})
 		return
 	}
-	s.DB.Delete(&models.Account{}, id)
+	tdb(c).Delete(&models.Account{}, id)
 	c.JSON(200, gin.H{"message": "Silindi"})
 }
 
@@ -222,7 +248,7 @@ func (s *Server) DeleteAccount(c *gin.Context) {
 
 func (s *Server) ListCurrencies(c *gin.Context) {
 	var items []models.Currency
-	s.DB.Order("is_base desc, code asc").Find(&items)
+	tdb(c).Order("is_base desc, code asc").Find(&items)
 	c.JSON(200, items)
 }
 func (s *Server) CreateCurrency(c *gin.Context) { s.genericCreate(c, &models.Currency{}) }
@@ -233,7 +259,7 @@ func (s *Server) DeleteCurrency(c *gin.Context) { s.genericDelete(c, &models.Cur
 
 func (s *Server) ListTaxRates(c *gin.Context) {
 	var items []models.TaxRate
-	s.DB.Order("is_default desc, rate desc").Find(&items)
+	tdb(c).Order("is_default desc, rate desc").Find(&items)
 	c.JSON(200, items)
 }
 func (s *Server) CreateTaxRate(c *gin.Context) { s.genericCreate(c, &models.TaxRate{}) }
@@ -244,7 +270,7 @@ func (s *Server) DeleteTaxRate(c *gin.Context) { s.genericDelete(c, &models.TaxR
 
 func (s *Server) ListWarehouses(c *gin.Context) {
 	var items []models.Warehouse
-	s.DB.Order("is_default desc, name asc").Find(&items)
+	tdb(c).Order("is_default desc, name asc").Find(&items)
 	c.JSON(200, items)
 }
 func (s *Server) CreateWarehouse(c *gin.Context) { s.genericCreate(c, &models.Warehouse{}) }
@@ -255,7 +281,7 @@ func (s *Server) DeleteWarehouse(c *gin.Context) { s.genericDelete(c, &models.Wa
 
 func (s *Server) ListPartners(c *gin.Context) {
 	var items []models.Partner
-	q := s.DB.Order("name asc")
+	q := tdb(c).Order("name asc")
 	if t := c.Query("type"); t != "" {
 		q = q.Where("type = ? OR type = ?", t, "both")
 	}
@@ -275,7 +301,7 @@ func (s *Server) DeletePartner(c *gin.Context) { s.genericDelete(c, &models.Part
 
 func (s *Server) ListProducts(c *gin.Context) {
 	var items []models.Product
-	q := s.DB.Order("name asc")
+	q := tdb(c).Order("name asc")
 	if search := c.Query("q"); search != "" {
 		like := "%" + search + "%"
 		q = q.Where("name ILIKE ? OR code ILIKE ? OR barcode ILIKE ?", like, like, like)
@@ -292,7 +318,7 @@ func (s *Server) DeleteProduct(c *gin.Context) { s.genericDelete(c, &models.Prod
 
 func (s *Server) ListJournal(c *gin.Context) {
 	var items []models.JournalEntry
-	q := s.DB.Preload("Lines").Order("date desc, id desc")
+	q := tdb(c).Preload("Lines").Order("date desc, id desc")
 	if st := c.Query("status"); st != "" {
 		q = q.Where("status = ?", st)
 	}
@@ -312,7 +338,7 @@ func (s *Server) GetJournal(c *gin.Context) {
 		return
 	}
 	var e models.JournalEntry
-	if err := s.DB.Preload("Lines").First(&e, id).Error; err != nil {
+	if err := tdb(c).Preload("Lines").First(&e, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Yazılış tapılmadı"})
 		return
 	}
@@ -329,7 +355,7 @@ func (s *Server) CreateJournal(c *gin.Context) {
 		e.Date = models.Date{Time: time.Now()}
 	}
 	if e.Number == "" {
-		e.Number, _ = engine.NextNumber(s.DB, "journal", "J-")
+		e.Number, _ = engine.NextNumber(tdb(c), "journal", "J-")
 	}
 	e.Status = "draft"
 	e.ID = 0
@@ -337,17 +363,17 @@ func (s *Server) CreateJournal(c *gin.Context) {
 		e.Lines[i].ID = 0
 		e.Lines[i].Posted = false
 	}
-	if err := s.DB.Create(&e).Error; err != nil {
+	if err := tdb(c).Create(&e).Error; err != nil {
 		c.JSON(500, gin.H{"detail": "Yaradıla bilmədi: " + err.Error()})
 		return
 	}
 	if c.Query("post") == "1" {
-		if _, err := engine.PostEntry(s.DB, e.ID); err != nil {
+		if _, err := engine.PostEntry(tdb(c), e.ID); err != nil {
 			c.JSON(400, gin.H{"detail": err.Error(), "id": e.ID})
 			return
 		}
 	}
-	s.DB.Preload("Lines").First(&e, e.ID)
+	tdb(c).Preload("Lines").First(&e, e.ID)
 	c.JSON(201, e)
 }
 
@@ -357,7 +383,7 @@ func (s *Server) UpdateJournal(c *gin.Context) {
 		return
 	}
 	var e models.JournalEntry
-	if err := s.DB.First(&e, id).Error; err != nil {
+	if err := tdb(c).First(&e, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -370,7 +396,7 @@ func (s *Server) UpdateJournal(c *gin.Context) {
 		c.JSON(400, gin.H{"detail": "Yanlış məlumat"})
 		return
 	}
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := tdb(c).Transaction(func(tx *gorm.DB) error {
 		e.Date = in.Date
 		e.Description = in.Description
 		e.Reference = in.Reference
@@ -392,7 +418,7 @@ func (s *Server) UpdateJournal(c *gin.Context) {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
 	}
-	s.DB.Preload("Lines").First(&e, id)
+	tdb(c).Preload("Lines").First(&e, id)
 	c.JSON(200, e)
 }
 
@@ -401,7 +427,7 @@ func (s *Server) PostJournal(c *gin.Context) {
 	if !ok {
 		return
 	}
-	e, err := engine.PostEntry(s.DB, id)
+	e, err := engine.PostEntry(tdb(c), id)
 	if err != nil {
 		c.JSON(400, gin.H{"detail": err.Error()})
 		return
@@ -414,7 +440,7 @@ func (s *Server) UnpostJournal(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := engine.UnpostEntry(s.DB, id); err != nil {
+	if err := engine.UnpostEntry(tdb(c), id); err != nil {
 		c.JSON(400, gin.H{"detail": err.Error()})
 		return
 	}
@@ -427,7 +453,7 @@ func (s *Server) DeleteJournal(c *gin.Context) {
 		return
 	}
 	var e models.JournalEntry
-	if err := s.DB.First(&e, id).Error; err != nil {
+	if err := tdb(c).First(&e, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -435,8 +461,8 @@ func (s *Server) DeleteJournal(c *gin.Context) {
 		c.JSON(400, gin.H{"detail": "Təsdiqlənmiş yazılış silinə bilməz"})
 		return
 	}
-	s.DB.Where("entry_id = ?", id).Delete(&models.JournalLine{})
-	s.DB.Delete(&models.JournalEntry{}, id)
+	tdb(c).Where("entry_id = ?", id).Delete(&models.JournalLine{})
+	tdb(c).Delete(&models.JournalEntry{}, id)
 	c.JSON(200, gin.H{"message": "Silindi"})
 }
 
@@ -444,7 +470,7 @@ func (s *Server) DeleteJournal(c *gin.Context) {
 
 func (s *Server) ListDocuments(c *gin.Context) {
 	var items []models.Document
-	q := s.DB.Preload("Lines").Order("date desc, id desc")
+	q := tdb(c).Preload("Lines").Order("date desc, id desc")
 	if t := c.Query("type"); t != "" {
 		q = q.Where("type = ?", t)
 	}
@@ -461,7 +487,7 @@ func (s *Server) GetDocument(c *gin.Context) {
 		return
 	}
 	var d models.Document
-	if err := s.DB.Preload("Lines").First(&d, id).Error; err != nil {
+	if err := tdb(c).Preload("Lines").First(&d, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Sənəd tapılmadı"})
 		return
 	}
@@ -500,27 +526,27 @@ func (s *Server) CreateDocument(c *gin.Context) {
 	}
 	if d.Number == "" {
 		key, prefix := seqKeyForType(d.Type)
-		d.Number, _ = engine.NextNumber(s.DB, key, prefix)
+		d.Number, _ = engine.NextNumber(tdb(c), key, prefix)
 	}
 	d.Status = "draft"
 	d.ID = 0
 	for i := range d.Lines {
 		d.Lines[i].ID = 0
 	}
-	if err := s.DB.Create(&d).Error; err != nil {
+	if err := tdb(c).Create(&d).Error; err != nil {
 		c.JSON(500, gin.H{"detail": "Yaradıla bilmədi: " + err.Error()})
 		return
 	}
 	// Recompute totals from lines and persist.
-	s.DB.Preload("Lines").First(&d, d.ID)
-	s.recomputeAndSave(&d)
+	tdb(c).Preload("Lines").First(&d, d.ID)
+	s.recomputeAndSave(c, &d)
 	if c.Query("post") == "1" {
-		if _, err := engine.PostDocument(s.DB, d.ID); err != nil {
+		if _, err := engine.PostDocument(tdb(c), d.ID); err != nil {
 			c.JSON(400, gin.H{"detail": err.Error(), "id": d.ID})
 			return
 		}
 	}
-	s.DB.Preload("Lines").First(&d, d.ID)
+	tdb(c).Preload("Lines").First(&d, d.ID)
 	c.JSON(201, d)
 }
 
@@ -530,7 +556,7 @@ func (s *Server) UpdateDocument(c *gin.Context) {
 		return
 	}
 	var d models.Document
-	if err := s.DB.First(&d, id).Error; err != nil {
+	if err := tdb(c).First(&d, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -543,7 +569,7 @@ func (s *Server) UpdateDocument(c *gin.Context) {
 		c.JSON(400, gin.H{"detail": "Yanlış məlumat"})
 		return
 	}
-	err := s.DB.Transaction(func(tx *gorm.DB) error {
+	err := tdb(c).Transaction(func(tx *gorm.DB) error {
 		d.Date = in.Date
 		d.DueDate = in.DueDate
 		d.PartnerID = in.PartnerID
@@ -571,14 +597,14 @@ func (s *Server) UpdateDocument(c *gin.Context) {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
 	}
-	s.DB.Preload("Lines").First(&d, id)
-	s.recomputeAndSave(&d)
-	s.DB.Preload("Lines").First(&d, id)
+	tdb(c).Preload("Lines").First(&d, id)
+	s.recomputeAndSave(c, &d)
+	tdb(c).Preload("Lines").First(&d, id)
 	c.JSON(200, d)
 }
 
 // recomputeAndSave recalculates line/document totals and persists them.
-func (s *Server) recomputeAndSave(d *models.Document) {
+func (s *Server) recomputeAndSave(c *gin.Context, d *models.Document) {
 	var sub, tax float64
 	for i := range d.Lines {
 		l := &d.Lines[i]
@@ -587,13 +613,13 @@ func (s *Server) recomputeAndSave(d *models.Document) {
 		l.TaxAmount = round2(net * l.TaxRate / 100)
 		sub += net
 		tax += l.TaxAmount
-		s.DB.Model(&models.DocumentLine{}).Where("id = ?", l.ID).
+		tdb(c).Model(&models.DocumentLine{}).Where("id = ?", l.ID).
 			Updates(map[string]interface{}{"line_total": l.LineTotal, "tax_amount": l.TaxAmount})
 	}
 	d.Subtotal = round2(sub)
 	d.TaxTotal = round2(tax)
 	d.Total = round2(sub + tax)
-	s.DB.Model(&models.Document{}).Where("id = ?", d.ID).
+	tdb(c).Model(&models.Document{}).Where("id = ?", d.ID).
 		Updates(map[string]interface{}{"subtotal": d.Subtotal, "tax_total": d.TaxTotal, "total": d.Total})
 }
 
@@ -612,7 +638,7 @@ func (s *Server) PostDocument(c *gin.Context) {
 	if !ok {
 		return
 	}
-	d, err := engine.PostDocument(s.DB, id)
+	d, err := engine.PostDocument(tdb(c), id)
 	if err != nil {
 		c.JSON(400, gin.H{"detail": err.Error()})
 		return
@@ -626,7 +652,7 @@ func (s *Server) DeleteDocument(c *gin.Context) {
 		return
 	}
 	var d models.Document
-	if err := s.DB.First(&d, id).Error; err != nil {
+	if err := tdb(c).First(&d, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -634,8 +660,8 @@ func (s *Server) DeleteDocument(c *gin.Context) {
 		c.JSON(400, gin.H{"detail": "Təsdiqlənmiş sənəd silinə bilməz"})
 		return
 	}
-	s.DB.Where("document_id = ?", id).Delete(&models.DocumentLine{})
-	s.DB.Delete(&models.Document{}, id)
+	tdb(c).Where("document_id = ?", id).Delete(&models.DocumentLine{})
+	tdb(c).Delete(&models.Document{}, id)
 	c.JSON(200, gin.H{"message": "Silindi"})
 }
 
@@ -643,7 +669,7 @@ func (s *Server) DeleteDocument(c *gin.Context) {
 
 func (s *Server) TrialBalance(c *gin.Context) {
 	to := endOfDay(parseDate(c.Query("to")))
-	rep, err := engine.TrialBalance(s.DB, to)
+	rep, err := engine.TrialBalance(tdb(c), to)
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
@@ -659,7 +685,7 @@ func (s *Server) Ledger(c *gin.Context) {
 	}
 	from := parseDate(c.Query("from"))
 	to := endOfDay(parseDate(c.Query("to")))
-	rep, err := engine.Ledger(s.DB, uint(accID), from, to)
+	rep, err := engine.Ledger(tdb(c), uint(accID), from, to)
 	if err != nil {
 		c.JSON(404, gin.H{"detail": err.Error()})
 		return
@@ -669,7 +695,7 @@ func (s *Server) Ledger(c *gin.Context) {
 
 func (s *Server) BalanceSheet(c *gin.Context) {
 	to := endOfDay(parseDate(c.Query("to")))
-	rep, err := engine.BalanceSheet(s.DB, to)
+	rep, err := engine.BalanceSheet(tdb(c), to)
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
@@ -680,7 +706,7 @@ func (s *Server) BalanceSheet(c *gin.Context) {
 func (s *Server) ProfitLoss(c *gin.Context) {
 	from := parseDate(c.Query("from"))
 	to := endOfDay(parseDate(c.Query("to")))
-	rep, err := engine.ProfitLoss(s.DB, from, to)
+	rep, err := engine.ProfitLoss(tdb(c), from, to)
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
@@ -689,7 +715,7 @@ func (s *Server) ProfitLoss(c *gin.Context) {
 }
 
 func (s *Server) PartnerBalancesReport(c *gin.Context) {
-	rep, err := engine.PartnerBalances(s.DB)
+	rep, err := engine.PartnerBalances(tdb(c))
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
@@ -698,7 +724,7 @@ func (s *Server) PartnerBalancesReport(c *gin.Context) {
 }
 
 func (s *Server) StockReport(c *gin.Context) {
-	rep, err := engine.StockLevels(s.DB)
+	rep, err := engine.StockLevels(tdb(c))
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
@@ -707,7 +733,7 @@ func (s *Server) StockReport(c *gin.Context) {
 }
 
 func (s *Server) DashboardHandler(c *gin.Context) {
-	d, err := engine.BuildDashboard(s.DB, time.Now())
+	d, err := engine.BuildDashboard(tdb(c), time.Now())
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return
@@ -719,7 +745,7 @@ func (s *Server) DashboardHandler(c *gin.Context) {
 
 func (s *Server) GetSettings(c *gin.Context) {
 	var items []models.Setting
-	s.DB.Find(&items)
+	tdb(c).Find(&items)
 	out := map[string]string{}
 	for _, it := range items {
 		out[it.Key] = it.Value
@@ -737,7 +763,7 @@ func (s *Server) UpdateSettings(c *gin.Context) {
 		if k == "seeded" {
 			continue
 		}
-		s.DB.Save(&models.Setting{Key: k, Value: v, UpdatedAt: time.Now()})
+		tdb(c).Save(&models.Setting{Key: k, Value: v, UpdatedAt: time.Now()})
 	}
 	c.JSON(200, gin.H{"message": "Yadda saxlanıldı"})
 }
@@ -750,7 +776,7 @@ func (s *Server) genericGet(c *gin.Context, model interface{}) {
 	if !ok {
 		return
 	}
-	if err := s.DB.First(model, id).Error; err != nil {
+	if err := tdb(c).First(model, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -762,7 +788,7 @@ func (s *Server) genericCreate(c *gin.Context, model interface{}) {
 		c.JSON(400, gin.H{"detail": "Yanlış məlumat"})
 		return
 	}
-	if err := s.DB.Create(model).Error; err != nil {
+	if err := tdb(c).Create(model).Error; err != nil {
 		c.JSON(500, gin.H{"detail": "Yaradıla bilmədi: " + err.Error()})
 		return
 	}
@@ -774,7 +800,7 @@ func (s *Server) genericUpdate(c *gin.Context, model interface{}) {
 	if !ok {
 		return
 	}
-	if err := s.DB.First(model, id).Error; err != nil {
+	if err := tdb(c).First(model, id).Error; err != nil {
 		c.JSON(404, gin.H{"detail": "Tapılmadı"})
 		return
 	}
@@ -782,8 +808,8 @@ func (s *Server) genericUpdate(c *gin.Context, model interface{}) {
 	c.ShouldBindJSON(&updates)
 	delete(updates, "id")
 	delete(updates, "created_at")
-	s.DB.Model(model).Updates(updates)
-	s.DB.First(model, id)
+	tdb(c).Model(model).Updates(updates)
+	tdb(c).First(model, id)
 	c.JSON(200, model)
 }
 
@@ -792,7 +818,7 @@ func (s *Server) genericDelete(c *gin.Context, model interface{}) {
 	if !ok {
 		return
 	}
-	if err := s.DB.Delete(model, id).Error; err != nil {
+	if err := tdb(c).Delete(model, id).Error; err != nil {
 		c.JSON(500, gin.H{"detail": "Silinə bilmədi"})
 		return
 	}
