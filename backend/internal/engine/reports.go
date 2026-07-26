@@ -364,6 +364,48 @@ func StockLevels(db *gorm.DB) ([]StockLevelRow, error) {
 	return out, nil
 }
 
+// VATReport — ƏDV (VAT) declaration for a period.
+type VATReport struct {
+	From         *time.Time `json:"from"`
+	To           *time.Time `json:"to"`
+	SalesBase    float64    `json:"sales_base"`    // vergitutma bazası (satış)
+	OutputVAT    float64    `json:"output_vat"`    // hesablanmış ƏDV (satışdan)
+	PurchaseBase float64    `json:"purchase_base"` // vergitutma bazası (alış)
+	InputVAT     float64    `json:"input_vat"`     // əvəzləşdirilən ƏDV (alışdan)
+	Payable      float64    `json:"payable"`       // ödəniləcək (+) / gələcəyə keçən (-)
+}
+
+// VATDeclaration sums VAT from posted sales/purchase invoices in the period.
+// Output VAT (from sales) minus input VAT (from purchases) = amount payable.
+func VATDeclaration(db *gorm.DB, from, to *time.Time) (*VATReport, error) {
+	type agg struct {
+		Base float64
+		Tax  float64
+	}
+	sum := func(typ string) agg {
+		var a agg
+		q := db.Model(&models.Document{}).
+			Select("COALESCE(SUM(subtotal),0) as base, COALESCE(SUM(tax_total),0) as tax").
+			Where("type = ? AND status IN ?", typ, []string{"posted", "paid"})
+		if from != nil {
+			q = q.Where("date >= ?", *from)
+		}
+		if to != nil {
+			q = q.Where("date <= ?", *to)
+		}
+		q.Scan(&a)
+		return a
+	}
+	s := sum("sales_invoice")
+	p := sum("purchase_invoice")
+	return &VATReport{
+		From: from, To: to,
+		SalesBase: round2(s.Base), OutputVAT: round2(s.Tax),
+		PurchaseBase: round2(p.Base), InputVAT: round2(p.Tax),
+		Payable: round2(s.Tax - p.Tax),
+	}, nil
+}
+
 // Dashboard — headline KPIs for the home screen.
 type Dashboard struct {
 	Cash            float64 `json:"cash"`

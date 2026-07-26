@@ -27,6 +27,7 @@ const REPORTS = [
   { id: 'trial', t: 'Dövriyyə balansı', path: '/reports/trial' },
   { id: 'balance', t: 'Balans hesabatı', path: '/reports/balance' },
   { id: 'pl', t: 'Mənfəət və zərər', path: '/reports/pl' },
+  { id: 'vat', t: 'ƏDV bəyannaməsi', path: '/reports/vat' },
   { id: 'partnerbal', t: 'Debitor / Kreditor', path: '/reports/partners' },
   { id: 'stock', t: 'Anbar qalıqları', path: '/reports/stock', mod: 'inventory' },
 ]

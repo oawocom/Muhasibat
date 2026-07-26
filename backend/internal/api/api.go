@@ -172,6 +172,7 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		t.GET("/reports/ledger/:accountId", s.Ledger)
 		t.GET("/reports/balance-sheet", s.BalanceSheet)
 		t.GET("/reports/profit-loss", s.ProfitLoss)
+		t.GET("/reports/vat", s.VATReport)
 		t.GET("/reports/partner-balances", s.PartnerBalancesReport)
 		t.GET("/reports/stock", s.StockReport)
 		t.GET("/dashboard", s.DashboardHandler)
@@ -762,6 +763,17 @@ func (s *Server) ProfitLoss(c *gin.Context) {
 	from := parseDate(c.Query("from"))
 	to := endOfDay(parseDate(c.Query("to")))
 	rep, err := engine.ProfitLoss(tdb(c), from, to)
+	if err != nil {
+		c.JSON(500, gin.H{"detail": err.Error()})
+		return
+	}
+	c.JSON(200, rep)
+}
+
+func (s *Server) VATReport(c *gin.Context) {
+	from := parseDate(c.Query("from"))
+	to := endOfDay(parseDate(c.Query("to")))
+	rep, err := engine.VATDeclaration(tdb(c), from, to)
 	if err != nil {
 		c.JSON(500, gin.H{"detail": err.Error()})
 		return

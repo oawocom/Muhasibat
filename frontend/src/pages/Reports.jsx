@@ -6,7 +6,7 @@ import { useAuth } from '../store.jsx'
 
 const TITLES = {
   trial: 'Dövriyyə balansı', balance: 'Balans hesabatı', pl: 'Mənfəət və zərər',
-  partners: 'Debitor / Kreditor', stock: 'Anbar qalıqları',
+  vat: 'ƏDV bəyannaməsi', partners: 'Debitor / Kreditor', stock: 'Anbar qalıqları',
 }
 
 export default function Reports() {
@@ -30,6 +30,7 @@ export default function Reports() {
     if (kind === 'trial') path = '/reports/trial-balance?to=' + to
     else if (kind === 'balance') path = '/reports/balance-sheet?to=' + to
     else if (kind === 'pl') path = '/reports/profit-loss?from=' + from + '&to=' + to
+    else if (kind === 'vat') path = '/reports/vat?from=' + from + '&to=' + to
     else if (kind === 'partners') path = '/reports/partner-balances'
     else if (kind === 'stock') path = '/reports/stock'
     else path = '/reports/trial-balance'
@@ -37,8 +38,8 @@ export default function Reports() {
   }
   useEffect(() => { load() }, [kind, auth.company?.id]) // eslint-disable-line
 
-  const showFrom = kind === 'pl'
-  const showTo = kind === 'trial' || kind === 'balance' || kind === 'pl'
+  const showFrom = kind === 'pl' || kind === 'vat'
+  const showTo = kind === 'trial' || kind === 'balance' || kind === 'pl' || kind === 'vat'
   return (
     <>
       <PageHeader title={TITLES[kind] || 'Hesabat'}>
@@ -51,6 +52,7 @@ export default function Reports() {
       {data && kind === 'trial' && <Trial d={data} />}
       {data && kind === 'balance' && <BalanceSheet d={data} />}
       {data && kind === 'pl' && <ProfitLoss d={data} />}
+      {data && kind === 'vat' && <VAT d={data} />}
       {data && kind === 'partners' && <PartnerBalances d={data} />}
       {data && kind === 'stock' && <Stock d={data} />}
     </>
@@ -108,6 +110,32 @@ function ProfitLoss({ d }) {
       </div>
       <Section title="GƏLİRLƏR" sec={d.income} totalLabel="Cəmi gəlir" />
       <Section title="XƏRCLƏR" sec={d.expense} totalLabel="Cəmi xərc" />
+    </>
+  )
+}
+
+function VAT({ d }) {
+  const payable = d.payable >= 0
+  return (
+    <>
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="card"><div className="text-muted">Hesablanmış ƏDV (satış)</div><div className="mono text-2xl font-extrabold text-ok">{money(d.output_vat)} ₼</div></div>
+        <div className="card"><div className="text-muted">Əvəzləşdirilən ƏDV (alış)</div><div className="mono text-2xl font-extrabold text-danger">{money(d.input_vat)} ₼</div></div>
+        <div className="card">
+          <div className="text-muted">{payable ? 'Ödəniləcək ƏDV' : 'Gələcəyə keçən ƏDV'}</div>
+          <div className={`mono text-2xl font-extrabold ${payable ? '' : 'text-ok'}`}>{money(Math.abs(d.payable))} ₼</div>
+        </div>
+      </div>
+      <Table title="ƏDV hesablaması" columns={[
+        { h: 'Göstərici', k: 'label' },
+        { h: 'Vergitutma bazası', right: true, render: (r) => r.base === '' ? '' : money(r.base) },
+        { h: 'ƏDV (18%)', right: true, render: (r) => money(r.vat) },
+      ]} rows={[
+        { id: 1, label: 'Satış (hesablanmış)', base: d.sales_base, vat: d.output_vat },
+        { id: 2, label: 'Alış (əvəzləşdirilən)', base: d.purchase_base, vat: d.input_vat },
+        { id: 3, label: payable ? 'Ödəniləcək ƏDV' : 'Gələcəyə keçən ƏDV', base: '', vat: Math.abs(d.payable) },
+      ]} />
+      <p className="mt-3 text-sm text-muted">Dövr üzrə təsdiqlənmiş (posted) satış və alış fakturaları əsasında. Bəyannamə üçün ilkin hesablamadır.</p>
     </>
   )
 }
