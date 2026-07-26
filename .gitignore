@@ -1,2 +1,5 @@
 backend/web/*
 !backend/web/.gitkeep
+
+# secrets
+.env

@@ -8,7 +8,7 @@ services:
     container_name: oawo_muhasibat_db
     environment:
       POSTGRES_USER: oawo
-      POSTGRES_PASSWORD: oawo
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-oawo}"
       POSTGRES_DB: oawo_muhasibat
     volumes:
       - muhasibat_pg:/var/lib/postgresql/data
@@ -31,15 +31,15 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       DB_USER: oawo
-      DB_PASSWORD: oawo
+      DB_PASSWORD: "${DB_PASSWORD:-oawo}"
       DB_NAME: oawo_muhasibat
       DB_SSLMODE: disable
       PORT: "8080"
       GIN_MODE: release
-      JWT_SECRET: "change-me-in-production"
-      ADMIN_EMAIL: "admin@oawo.com"
-      ADMIN_PASSWORD: "admin123"
-      COMPANY_NAME: "OAWO MMC"
+      JWT_SECRET: "${JWT_SECRET:-change-me-in-production}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@oawo.com}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      COMPANY_NAME: "${COMPANY_NAME:-OAWO}"
     ports:
       - "8090:8080"
     restart: unless-stopped
