@@ -22,6 +22,15 @@
   --shadow: 0 10px 30px rgba(0,0,0,.35);
 }
 
+/* ---- Subtle scrollbars: thin in content, hidden on the sidebar ---- */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); }
+*::-webkit-scrollbar-track { background: transparent; }
+aside { scrollbar-width: none; }
+aside::-webkit-scrollbar { display: none; }
+
 @layer base {
   html, body, #root { height: 100%; }
   body {
