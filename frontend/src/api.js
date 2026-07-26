@@ -44,4 +44,4 @@ export const today = () => new Date().toISOString().slice(0, 10)
 export const monthStart = () => today().slice(0, 8) + '01'
 
 export const roleLabel = (r) =>
-  ({ owner: 'Sahib', admin: 'Admin', accountant: 'Mühasib', warehouse: 'Anbardar', viewer: 'Baxış' }[r] || r || '')
+  ({ owner: 'Sahib', admin: 'Admin', accountant: 'Mühasib', warehouse: 'Anbardar', cashier: 'Kassir', viewer: 'Baxış' }[r] || r || '')

@@ -41,6 +41,13 @@ function buildNav(auth) {
       { t: 'Tenantlar (abunələr)', ic: '🗂', path: '/tenants' },
     ]
   }
+  // A cashier sees only the POS terminal.
+  if (auth.company?.role === 'cashier') {
+    return [
+      { g: 'Kassa' },
+      { t: 'Kassa (POS)', ic: '🛒', path: '/pos' },
+    ]
+  }
   const items = [
     { g: 'Əsas' },
     { t: 'İdarə paneli', ic: '▚', path: '/' },
@@ -174,7 +181,7 @@ export default function App() {
         <TopBar theme={theme} onToggleTheme={toggleTheme} />
         <div className="px-6 py-5">
           <Routes>
-            <Route path="/" element={auth.isSuper ? <Navigate to="/tenants" replace /> : <RequireCompany><Dashboard /></RequireCompany>} />
+            <Route path="/" element={auth.isSuper ? <Navigate to="/tenants" replace /> : auth.company?.role === 'cashier' ? <Navigate to="/pos" replace /> : <RequireCompany><Dashboard /></RequireCompany>} />
             <Route path="/tenants" element={auth.isSuper ? <Tenants /> : <Navigate to="/" replace />} />
             <Route path="/companies" element={<Companies />} />
             <Route path="/users" element={<RequireCompany><Users /></RequireCompany>} />

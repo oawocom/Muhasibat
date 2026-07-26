@@ -100,6 +100,7 @@ const (
 	RoleAdmin      = "admin"
 	RoleAccountant = "accountant"
 	RoleWarehouse  = "warehouse"
+	RoleCashier    = "cashier"
 	RoleViewer     = "viewer"
 )
 

@@ -283,11 +283,35 @@ func (s *Server) TenantMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// A cashier may only reach POS operations (and the reads the POS
+		// terminal needs); everything else in the company is off-limits.
+		if role == models.RoleCashier && !cashierAllowed(c.Request.Method, c.Request.URL.Path) {
+			c.JSON(403, gin.H{"detail": "Kassir yalnız kassa (POS) əməliyyatlarına icazəlidir"})
+			c.Abort()
+			return
+		}
+
 		c.Set("tdb", tenantDB)
 		c.Set("role", role)
 		c.Set("companyID", company.ID)
 		c.Next()
 	}
+}
+
+// cashierAllowed whitelists the endpoints a cashier role may call: all POS
+// operations, plus the read-only lookups the terminal loads.
+func cashierAllowed(method, path string) bool {
+	if strings.HasPrefix(path, "/api/pos") {
+		return true
+	}
+	if method == "GET" {
+		for _, p := range []string{"/api/products", "/api/tax-rates", "/api/warehouses", "/api/reports/stock"} {
+			if strings.HasPrefix(path, p) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // tdb returns the request-scoped tenant database.

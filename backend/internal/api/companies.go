@@ -13,7 +13,7 @@ import (
 
 var validRoles = map[string]bool{
 	models.RoleOwner: true, models.RoleAdmin: true, models.RoleAccountant: true,
-	models.RoleWarehouse: true, models.RoleViewer: true,
+	models.RoleWarehouse: true, models.RoleCashier: true, models.RoleViewer: true,
 }
 
 // currentUser loads the authenticated user.
@@ -293,6 +293,7 @@ func (s *Server) Roles(c *gin.Context) {
 		{"key": models.RoleAdmin, "label": "Admin"},
 		{"key": models.RoleAccountant, "label": "Mühasib"},
 		{"key": models.RoleWarehouse, "label": "Anbardar"},
+		{"key": models.RoleCashier, "label": "Kassir (yalnız POS)"},
 		{"key": models.RoleViewer, "label": "Baxış (yalnız oxu)"},
 	})
 }
