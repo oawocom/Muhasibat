@@ -55,17 +55,29 @@ function ConfigCard({ cfg, companyName, canWrite }) {
   return (
     <div className="card mb-4">
       <div className="flex items-center justify-between">
-        <div><b>Satıcı VÖEN:</b> <span className="mono">{cfg.data.seller_voen || '— təyin edilməyib'}</span>{cfg.data.endpoint && <span className="chip ml-2">inteqrasiya aktiv</span>}</div>
+        <div>
+          <b>Satıcı VÖEN:</b> <span className="mono">{cfg.data.seller_voen || '— təyin edilməyib'}</span>
+          {cfg.data.mode === 'live' && <span className="chip ml-2">real inteqrasiya</span>}
+          {cfg.data.mode === 'test' && <span className="chip ml-2">test rejimi</span>}
+        </div>
         {canWrite && <Btn sm variant="ghost" onClick={() => setOpen(!open)}>{open ? 'Bağla' : 'Parametrlər'}</Btn>}
       </div>
       {open && (
         <div className="mt-3 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <Field label="Satıcı VÖEN"><Input value={state.seller_voen || ''} onChange={set('seller_voen')} /></Field>
           <Field label="Şirkət adı"><Input value={state.company_name || ''} onChange={set('company_name')} /></Field>
-          <Field label="e-Qaimə API ünvanı (endpoint) — gələcək inteqrasiya"><Input value={state.endpoint || ''} onChange={set('endpoint')} placeholder="https://..." /></Field>
+          <Field label="Göndəriş rejimi">
+            <select className="input" value={state.mode || 'manual'} onChange={set('mode')}>
+              <option value="manual">Əl ilə (rəsmi nömrəni özün daxil et)</option>
+              <option value="test">Test (simulyasiya — demo/təlim üçün)</option>
+              <option value="live">Real inteqrasiya (e-taxes API)</option>
+            </select>
+          </Field>
+          <div />
+          <Field label="e-Qaimə API ünvanı (endpoint) — real inteqrasiya"><Input value={state.endpoint || ''} onChange={set('endpoint')} placeholder="https://..." /></Field>
           <Field label="API token"><Input value={state.token || ''} onChange={set('token')} /></Field>
           <div className="sm:col-span-2"><Btn variant="primary" onClick={save}>Yadda saxla</Btn>
-            <p className="mt-2 text-xs text-muted">Qeyd: dövlət e-qaimə sisteminə avtomatik göndəriş üçün e-taxes.gov.az rəsmi API ünvanı və token lazımdır. Onlar olmadan e-qaimə hazırlanır, rəsmi seriya/nömrəni əl ilə qeyd edirsiniz.</p>
+            <p className="mt-2 text-xs text-muted">Real göndəriş üçün e-taxes.gov.az rəsmi API ünvanı və token lazımdır. <b>Test</b> rejimi bütün axını simulyasiya edir (rəsmi qeydiyyat deyil). <b>Əl ilə</b> rejimdə e-qaimə hazırlanır, rəsmi seriya/nömrəni özün qeyd edirsən.</p>
           </div>
         </div>
       )}
@@ -81,8 +93,9 @@ function DetailModal({ e, cfg, canWrite, onClose, onChanged }) {
     try { await api.put('/einvoices/' + ei.id, reg); toast.ok('Qeydiyyat yeniləndi'); onChanged() } catch (er) { toast.err(er.message) }
   }
   async function send() {
-    try { const r = await api.post('/einvoices/' + ei.id + '/send'); toast.ok('Göndərildi'); onChanged() } catch (er) { toast.err(er.message) }
+    try { const r = await api.post('/einvoices/' + ei.id + '/send'); toast.ok(r.test ? 'Test rejimində qeydiyyatdan keçdi' : 'Göndərildi'); onChanged() } catch (er) { toast.err(er.message) }
   }
+  const canSend = cfg.mode === 'test' || cfg.mode === 'live' || cfg.endpoint
   function printIt() {
     const w = window.open('', '_blank'); if (!w) return
     w.document.write('<pre style="font-family:monospace;padding:24px;white-space:pre-wrap">' +
@@ -93,7 +106,7 @@ function DetailModal({ e, cfg, canWrite, onClose, onChanged }) {
     <Modal wide title="e-Qaimə" onClose={onClose}
       footer={<>
         <Btn variant="ghost" onClick={printIt}>🖨 Payload</Btn>
-        {cfg.endpoint && canWrite && <Btn onClick={send}>Portala göndər</Btn>}
+        {canSend && canWrite && <Btn onClick={send}>{cfg.mode === 'test' ? 'Test göndər' : 'Portala göndər'}</Btn>}
         {canWrite && <Btn variant="primary" onClick={saveReg}>Qeydiyyatı təsdiqlə</Btn>}
       </>}>
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">

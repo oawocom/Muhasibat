@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -16,7 +17,8 @@ import (
 type EInvoiceConfig struct {
 	SellerVoen  string `json:"seller_voen"`
 	CompanyName string `json:"company_name"`
-	Endpoint    string `json:"endpoint"` // gələcək inteqrasiya üçün (e-taxes API)
+	Mode        string `json:"mode"`     // manual | test | live
+	Endpoint    string `json:"endpoint"` // rəsmi e-taxes API ünvanı (live)
 	Token       string `json:"token"`
 }
 
@@ -186,8 +188,10 @@ func (s *Server) UpdateEInvoice(c *gin.Context) {
 	c.JSON(200, e)
 }
 
-// SendEInvoice best-effort POSTs the payload to a configured endpoint. Without
-// a configured endpoint (state credentials), it returns a clear message.
+// SendEInvoice submits the e-invoice. In "live" mode it POSTs the payload to
+// the configured e-taxes endpoint and records the portal's response. In "test"
+// mode it simulates a successful registration so the whole flow can be
+// demonstrated/trained without state credentials.
 func (s *Server) SendEInvoice(c *gin.Context) {
 	id, ok := s.bindID(c)
 	if !ok {
@@ -199,27 +203,74 @@ func (s *Server) SendEInvoice(c *gin.Context) {
 		return
 	}
 	cfg := s.loadEInvoiceConfig(c)
-	if cfg.Endpoint == "" {
-		c.JSON(400, gin.H{"detail": "e-Qaimə inteqrasiya ünvanı (endpoint) təyin edilməyib. Rəsmi qeydiyyat nömrəsini əl ilə daxil edin."})
-		return
-	}
-	httpReq, _ := http.NewRequest("POST", cfg.Endpoint, bytes.NewReader(e.Payload))
-	httpReq.Header.Set("Content-Type", "application/json")
-	if cfg.Token != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+cfg.Token)
-	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		c.JSON(502, gin.H{"detail": "Göndərilmə alınmadı: " + err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
 	now := models.Date{Time: time.Now()}
-	e.Status = "sent"
-	e.SentAt = &now
-	e.Note = string(body)
-	tdb(c).Save(&e)
-	c.JSON(resp.StatusCode, gin.H{"status": "sent", "response": string(body), "einvoice": e})
+
+	// Live: real submission to the portal.
+	if cfg.Mode == "live" || (cfg.Mode == "" && cfg.Endpoint != "") {
+		if cfg.Endpoint == "" {
+			c.JSON(400, gin.H{"detail": "Real inteqrasiya üçün endpoint təyin edilməlidir."})
+			return
+		}
+		httpReq, _ := http.NewRequest("POST", cfg.Endpoint, bytes.NewReader(e.Payload))
+		httpReq.Header.Set("Content-Type", "application/json")
+		if cfg.Token != "" {
+			httpReq.Header.Set("Authorization", "Bearer "+cfg.Token)
+		}
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			c.JSON(502, gin.H{"detail": "Göndərilmə alınmadı: " + err.Error()})
+			return
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		e.Status = "sent"
+		e.SentAt = &now
+		e.Note = string(body)
+		// Try to pick up the portal's registration id/series/number.
+		var pr struct {
+			ID, ExternalID, Number, Series, RegistrationNumber string
+		}
+		if json.Unmarshal(body, &pr) == nil {
+			if pr.ExternalID != "" {
+				e.ExternalID = pr.ExternalID
+			} else if pr.ID != "" {
+				e.ExternalID = pr.ID
+			}
+			if pr.Series != "" {
+				e.Series = pr.Series
+			}
+			if pr.RegistrationNumber != "" {
+				e.Number = pr.RegistrationNumber
+			} else if pr.Number != "" {
+				e.Number = pr.Number
+			}
+			if resp.StatusCode < 300 && e.Number != "" {
+				e.Status = "registered"
+			}
+		}
+		tdb(c).Save(&e)
+		c.JSON(resp.StatusCode, gin.H{"status": e.Status, "response": string(body), "einvoice": e})
+		return
+	}
+
+	// Test / simulation: mint a registration reference locally.
+	if cfg.Mode == "test" {
+		e.Status = "registered"
+		e.SentAt = &now
+		if e.Series == "" {
+			e.Series = "TEST"
+		}
+		if e.Number == "" {
+			e.Number = fmt.Sprintf("%s%06d", now.Time.Format("060102"), e.ID)
+		}
+		e.ExternalID = fmt.Sprintf("SIM-%d", e.ID)
+		e.Note = "Test rejimi — simulyasiya (rəsmi göndəriş deyil)"
+		tdb(c).Save(&e)
+		c.JSON(200, gin.H{"status": "registered", "test": true, "einvoice": e})
+		return
+	}
+
+	// Manual mode: no automatic sending configured.
+	c.JSON(400, gin.H{"detail": "Göndəriş rejimi seçilməyib. Parametrlərdən 'Test' və ya 'Real inteqrasiya' seçin, yaxud rəsmi nömrəni əl ilə daxil edin."})
 }
