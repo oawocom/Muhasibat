@@ -97,6 +97,12 @@ function Terminal({ session, onSessionChange }) {
   const toast = useToast()
   const products = useList('/products', [])
   const taxes = useList('/tax-rates', [])
+  const stock = useList('/reports/stock', [])
+  const stockOf = useMemo(() => {
+    const m = {}
+    for (const r of stock.data || []) m[r.product_id] = r.quantity
+    return m
+  }, [stock.data])
   const [cart, setCart] = useState([])
   const [q, setQ] = useState('')
   const [pay, setPay] = useState(null) // payment modal
@@ -157,13 +163,22 @@ function Terminal({ session, onSessionChange }) {
         <div>
           <Input placeholder="Barkodu skan et və ya məhsul axtar (ad / kod)…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onScanKey} className="mb-3" autoFocus />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((p) => (
+            {filtered.map((p) => {
+              const qty = stockOf[p.id]
+              const tracks = p.type !== 'service'
+              const out = tracks && qty !== undefined && qty <= 0
+              return (
               <button key={p.id} onClick={() => add(p)}
-                className="flex flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-soft hover:border-brand">
-                <span className="line-clamp-2 text-sm font-semibold">{p.name}</span>
+                className="relative flex flex-col items-start rounded-xl border border-line bg-surface p-3 text-left shadow-soft hover:border-brand">
+                {tracks && (
+                  <span className={`absolute right-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${out ? 'bg-danger/15 text-danger' : 'bg-surface2 text-muted'}`}>
+                    {out ? 'bitib' : `${money(qty ?? 0)} ${p.unit || ''}`}
+                  </span>
+                )}
+                <span className="line-clamp-2 pr-10 text-sm font-semibold">{p.name}</span>
                 <span className="mt-1 mono text-brand">{money(p.sale_price)} ₼</span>
               </button>
-            ))}
+            )})}
             {filtered.length === 0 && <div className="col-span-full py-8 text-center text-muted">Məhsul tapılmadı</div>}
           </div>
         </div>
@@ -205,8 +220,9 @@ function Terminal({ session, onSessionChange }) {
             lines: cart.map((l) => ({ product_id: l.product_id, name: l.name, quantity: l.quantity, unit_price: l.unit_price, tax_rate: l.tax_rate })),
           })
           setPay(null); setCart([]); setReceipt(sale)
-          // refresh session totals
+          // refresh session totals + stock levels
           const os = await api.get(`/pos/registers/${sess.register_id}/open-session`); if (os) { setSess(os); onSessionChange(os) }
+          stock.reload()
         } catch (e) { toast.err(e.message) }
       }} />}
 
@@ -303,20 +319,71 @@ function Info({ label, v }) { return <div className="rounded-xl bg-surface2 px-3
 function Registers({ onClose }) {
   const toast = useToast()
   const { data, reload } = useList('/pos/registers', [])
-  const [f, setF] = useState({ name: '', code: '' })
+  const warehouses = useList('/warehouses', [])
+  const accounts = useList('/accounts', [])
+  const [f, setF] = useState({ name: '', code: '', warehouse_id: '', cash_account_id: '' })
+  const [newWh, setNewWh] = useState('')
+
+  const whName = (id) => (warehouses.data || []).find((w) => w.id === id)?.name || '—'
+  // Cash-type accounts (kassa / bank) for the register's money account.
+  const cashAccounts = (accounts.data || []).filter((a) => a.system_key === 'cash' || a.system_key === 'bank' || /^22/.test(a.code || ''))
+
   async function create() {
     if (!f.name) { toast.err('Ad tələb olunur'); return }
-    try { await api.post('/pos/registers', f); toast.ok('Kassa yaradıldı'); setF({ name: '', code: '' }); reload() } catch (e) { toast.err(e.message) }
+    const body = { name: f.name, code: f.code }
+    if (f.warehouse_id) body.warehouse_id = Number(f.warehouse_id)
+    if (f.cash_account_id) body.cash_account_id = Number(f.cash_account_id)
+    try {
+      await api.post('/pos/registers', body)
+      toast.ok('Kassa yaradıldı')
+      setF((x) => ({ name: '', code: '', warehouse_id: x.warehouse_id, cash_account_id: x.cash_account_id }))
+      reload()
+    } catch (e) { toast.err(e.message) }
   }
+  async function createWarehouse() {
+    if (!newWh) { toast.err('Mağaza adı tələb olunur'); return }
+    try {
+      const w = await api.post('/warehouses', { name: newWh, enabled: true })
+      toast.ok('Mağaza yaradıldı'); setNewWh('')
+      warehouses.reload()
+      if (w && w.id) setF((x) => ({ ...x, warehouse_id: String(w.id) }))
+    } catch (e) { toast.err(e.message) }
+  }
+
   return (
-    <Modal title="Kassalar" onClose={onClose}>
-      <div className="mb-3 space-y-1">
-        {(data || []).map((r) => <div key={r.id} className="rounded-lg border border-line px-3 py-2 text-sm">{r.name} {r.code && <span className="text-muted">· {r.code}</span>}</div>)}
+    <Modal title="Kassalar və mağazalar" onClose={onClose}>
+      <div className="mb-4 space-y-1">
+        {(data || []).map((r) => (
+          <div key={r.id} className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-sm">
+            <span>{r.name} {r.code && <span className="text-muted">· {r.code}</span>}</span>
+            <span className="text-xs text-muted">🏬 {whName(r.warehouse_id)}</span>
+          </div>
+        ))}
         {data && data.length === 0 && <div className="text-muted text-sm">Hələ kassa yoxdur</div>}
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Field label="Ad"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-        <Field label="Kod"><Input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></Field>
+
+      {/* Yeni mağaza (anbar) */}
+      <div className="mb-4 rounded-xl border border-line bg-surface2 p-3">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Yeni mağaza (anbar)</div>
+        <div className="flex gap-2">
+          <Input placeholder="Mağaza adı — məs. Mərkəz filialı" value={newWh} onChange={(e) => setNewWh(e.target.value)} />
+          <Btn variant="ghost" onClick={createWarehouse}>+ Mağaza</Btn>
+        </div>
+      </div>
+
+      {/* Yeni kassa */}
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted">Yeni kassa</div>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Field label="Ad"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Kassa 1" /></Field>
+        <Field label="Kod"><Input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="K1" /></Field>
+        <Field label="Mağaza (anbar)">
+          <Select value={f.warehouse_id} onChange={(e) => setF({ ...f, warehouse_id: e.target.value })}
+            options={[{ value: '', label: '— əsas mağaza —' }, ...(warehouses.data || []).map((w) => ({ value: String(w.id), label: w.name }))]} />
+        </Field>
+        <Field label="Nağd hesab">
+          <Select value={f.cash_account_id} onChange={(e) => setF({ ...f, cash_account_id: e.target.value })}
+            options={[{ value: '', label: '— avtomatik (kassa) —' }, ...cashAccounts.map((a) => ({ value: String(a.id), label: `${a.code} · ${a.name}` }))]} />
+        </Field>
       </div>
       <Btn variant="primary" onClick={create}>+ Kassa yarat</Btn>
     </Modal>
