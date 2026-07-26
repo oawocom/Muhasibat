@@ -288,6 +288,28 @@ type PayrollLine struct {
 	MedicalEmpr  float64 `json:"medical_empr" gorm:"type:decimal(18,2)"`
 }
 
+// ==================== e-QAİMƏ (e-invoice) ====================
+// Prepares the official e-invoice payload from a sales invoice and tracks its
+// registration. Actual submission to the state portal needs e-taxes.gov.az
+// credentials; when configured, the payload can be POSTed to an endpoint.
+type EInvoice struct {
+	ID         uint            `json:"id" gorm:"primaryKey"`
+	DocumentID uint            `json:"document_id" gorm:"index;not null"`
+	Series     string          `json:"series" gorm:"size:16"`
+	Number     string          `json:"number" gorm:"size:32;index"`
+	Status     string          `json:"status" gorm:"size:16;index;default:draft"` // draft|sent|registered|cancelled
+	SellerVoen string          `json:"seller_voen" gorm:"size:20"`
+	BuyerVoen  string          `json:"buyer_voen" gorm:"size:20"`
+	Total      float64         `json:"total" gorm:"type:decimal(18,2)"`
+	TaxTotal   float64         `json:"tax_total" gorm:"type:decimal(18,2)"`
+	Payload    json.RawMessage `json:"payload" gorm:"type:jsonb"`
+	ExternalID string          `json:"external_id" gorm:"size:64"` // portalın qaytardığı ID
+	SentAt     *Date           `json:"sent_at"`
+	Note       string          `json:"note" gorm:"type:text"`
+	CreatedAt  time.Time       `json:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+}
+
 // TenantModels returns every accounting model — migrated into each
 // company's own database. (Users live in the platform DB, not here.)
 func TenantModels() []interface{} {
@@ -297,5 +319,6 @@ func TenantModels() []interface{} {
 		&Document{}, &DocumentLine{}, &Sequence{}, &Setting{},
 		&FixedAsset{}, &DepreciationEntry{},
 		&Employee{}, &PayrollRun{}, &PayrollLine{},
+		&EInvoice{},
 	}
 }

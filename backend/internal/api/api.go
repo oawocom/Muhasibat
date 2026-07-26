@@ -141,6 +141,16 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		t.POST("/payroll/runs/:id/post", s.PostPayrollRun)
 		t.DELETE("/payroll/runs/:id", s.DeletePayrollRun)
 
+		// e-Qaimə (e-invoice)
+		t.GET("/einvoice/config", s.GetEInvoiceConfig)
+		t.PUT("/einvoice/config", s.UpdateEInvoiceConfig)
+		t.GET("/einvoices", s.ListEInvoices)
+		t.GET("/einvoices/eligible", s.ListEligibleInvoices)
+		t.POST("/einvoices", s.CreateEInvoice)
+		t.GET("/einvoices/:id", s.GetEInvoice)
+		t.PUT("/einvoices/:id", s.UpdateEInvoice)
+		t.POST("/einvoices/:id/send", s.SendEInvoice)
+
 		// Reports
 		t.GET("/reports/trial-balance", s.TrialBalance)
 		t.GET("/reports/ledger/:accountId", s.Ledger)
