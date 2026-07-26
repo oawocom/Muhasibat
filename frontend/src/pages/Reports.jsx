@@ -17,6 +17,13 @@ export default function Reports() {
   const [data, setData] = useState(null)
   const [err, setErr] = useState(null)
 
+  // The route /reports/:kind reuses this one component for every report.
+  // When kind changes, `data` still holds the previous report (a different
+  // shape); reset it during render so a renderer never receives stale,
+  // wrong-shaped data before the effect refetches.
+  const [shownKind, setShownKind] = useState(kind)
+  if (shownKind !== kind) { setShownKind(kind); setData(null); setErr(null) }
+
   function load() {
     setData(null); setErr(null)
     let path
