@@ -11,6 +11,7 @@ import Partners from './pages/Partners.jsx'
 import Products from './pages/Products.jsx'
 import Invoices from './pages/Invoices.jsx'
 import Money from './pages/Money.jsx'
+import Pos from './pages/Pos.jsx'
 import FixedAssets from './pages/FixedAssets.jsx'
 import Payroll from './pages/Payroll.jsx'
 import EInvoice from './pages/EInvoice.jsx'
@@ -45,6 +46,7 @@ function buildNav(auth) {
     { t: 'İdarə paneli', ic: '▚', path: '/' },
     has('journal') && { t: 'Mühasibat jurnalı', ic: '≣', path: '/journal' },
     { g: 'Ticarət' },
+    has('pos') && { t: 'Kassa (POS)', ic: '🛒', path: '/pos' },
     has('sales') && { t: 'Satış fakturaları', ic: '↗', path: '/sales' },
     has('purchases') && { t: 'Alış fakturaları', ic: '↙', path: '/purchases' },
     has('money') && { t: 'Kassa / Bank', ic: '₼', path: '/money' },
@@ -177,6 +179,7 @@ export default function App() {
             <Route path="/sales" element={<RequireCompany><Invoices key="sales" type="sales_invoice" /></RequireCompany>} />
             <Route path="/purchases" element={<RequireCompany><Invoices key="purchases" type="purchase_invoice" /></RequireCompany>} />
             <Route path="/money" element={<RequireCompany><Money /></RequireCompany>} />
+            <Route path="/pos" element={<RequireCompany><Pos /></RequireCompany>} />
             <Route path="/fixed-assets" element={<RequireCompany><FixedAssets /></RequireCompany>} />
             <Route path="/payroll" element={<RequireCompany><Payroll /></RequireCompany>} />
             <Route path="/einvoice" element={<RequireCompany><EInvoice /></RequireCompany>} />

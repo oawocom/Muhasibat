@@ -233,6 +233,11 @@ func populate(db *gorm.DB) error {
 		engine.RunDepreciation(db, now)
 	}
 
+	// A POS register ready for sales.
+	if cash != 0 {
+		db.Create(&models.Register{Name: "Kassa 1", Code: "K1", WarehouseID: wh.ID, CashAccountID: cash, Enabled: true})
+	}
+
 	// Employees + one posted payroll run.
 	db.Create(&models.Employee{FullName: "Rəşad Quliyev", Position: "Direktor", Salary: 4000, Status: "active", TaxID: "AZE1234"})
 	db.Create(&models.Employee{FullName: "Günel Əliyeva", Position: "Mühasib", Salary: 1800, Status: "active", TaxID: "AZE5678"})

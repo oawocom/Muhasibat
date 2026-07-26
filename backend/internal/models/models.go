@@ -310,6 +310,64 @@ type EInvoice struct {
 	UpdatedAt  time.Time       `json:"updated_at"`
 }
 
+// ==================== POS (kassa aparatı) ====================
+type Register struct {
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	Name          string    `json:"name" gorm:"size:255;not null"`
+	Code          string    `json:"code" gorm:"size:32"`
+	WarehouseID   uint      `json:"warehouse_id"`   // hansı anbardan satılır
+	CashAccountID uint      `json:"cash_account_id"` // nağd ödənişlər üçün hesab
+	Enabled       bool      `json:"enabled" gorm:"default:true"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// PosSession is a cashier shift (növbə) on a register.
+type PosSession struct {
+	ID          uint       `json:"id" gorm:"primaryKey"`
+	RegisterID  uint       `json:"register_id" gorm:"index;not null"`
+	CashierName string     `json:"cashier_name" gorm:"size:255"`
+	Status      string     `json:"status" gorm:"size:16;index;default:open"` // open|closed
+	OpeningCash float64    `json:"opening_cash" gorm:"type:decimal(18,2)"`
+	ClosingCash float64    `json:"closing_cash" gorm:"type:decimal(18,2)"`
+	SalesCount  int        `json:"sales_count" gorm:"default:0"`
+	SalesTotal  float64    `json:"sales_total" gorm:"type:decimal(18,2);default:0"`
+	CashTotal   float64    `json:"cash_total" gorm:"type:decimal(18,2);default:0"`
+	CardTotal   float64    `json:"card_total" gorm:"type:decimal(18,2);default:0"`
+	OpenedAt    time.Time  `json:"opened_at"`
+	ClosedAt    *time.Time `json:"closed_at"`
+}
+
+type PosSale struct {
+	ID            uint          `json:"id" gorm:"primaryKey"`
+	SessionID     uint          `json:"session_id" gorm:"index;not null"`
+	RegisterID    uint          `json:"register_id" gorm:"index"`
+	Number        string        `json:"number" gorm:"size:32;index"`
+	Date          Date          `json:"date" gorm:"index"`
+	Subtotal      float64       `json:"subtotal" gorm:"type:decimal(18,2)"`
+	TaxTotal      float64       `json:"tax_total" gorm:"type:decimal(18,2)"`
+	Total         float64       `json:"total" gorm:"type:decimal(18,2)"`
+	Paid          float64       `json:"paid" gorm:"type:decimal(18,2)"`
+	Change        float64       `json:"change" gorm:"type:decimal(18,2)"`
+	PaymentMethod string        `json:"payment_method" gorm:"size:16"` // cash|card
+	InvoiceDocID  *uint         `json:"invoice_doc_id"`
+	ReceiptDocID  *uint         `json:"receipt_doc_id"`
+	Lines         []PosSaleLine `json:"lines" gorm:"foreignKey:SaleID;constraint:OnDelete:CASCADE"`
+	CreatedAt     time.Time     `json:"created_at"`
+}
+
+type PosSaleLine struct {
+	ID        uint    `json:"id" gorm:"primaryKey"`
+	SaleID    uint    `json:"sale_id" gorm:"index;not null"`
+	ProductID *uint   `json:"product_id"`
+	Name      string  `json:"name" gorm:"size:255"`
+	Quantity  float64 `json:"quantity" gorm:"type:decimal(18,3)"`
+	UnitPrice float64 `json:"unit_price" gorm:"type:decimal(18,2)"`
+	TaxRate   float64 `json:"tax_rate" gorm:"type:decimal(9,4)"`
+	LineTotal float64 `json:"line_total" gorm:"type:decimal(18,2)"`
+	TaxAmount float64 `json:"tax_amount" gorm:"type:decimal(18,2)"`
+}
+
 // TenantModels returns every accounting model — migrated into each
 // company's own database. (Users live in the platform DB, not here.)
 func TenantModels() []interface{} {
@@ -320,5 +378,6 @@ func TenantModels() []interface{} {
 		&FixedAsset{}, &DepreciationEntry{},
 		&Employee{}, &PayrollRun{}, &PayrollLine{},
 		&EInvoice{},
+		&Register{}, &PosSession{}, &PosSale{}, &PosSaleLine{},
 	}
 }

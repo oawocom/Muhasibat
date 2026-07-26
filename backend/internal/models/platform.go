@@ -132,6 +132,7 @@ func ModuleCatalog() []ModuleDef {
 		{Key: "purchases", Label: "Alış fakturaları", Core: false, Price: 10},
 		{Key: "money", Label: "Kassa / Bank", Core: false, Price: 8},
 		{Key: "inventory", Label: "Anbar", Core: false, Price: 12},
+		{Key: "pos", Label: "Kassa (POS)", Core: false, Price: 18},
 		{Key: "fixed_assets", Label: "Əsas vəsaitlər", Core: false, Price: 12},
 		{Key: "payroll", Label: "Əmək haqqı", Core: false, Price: 15},
 		{Key: "einvoice", Label: "e-Qaimə", Core: false, Price: 10},

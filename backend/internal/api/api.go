@@ -145,6 +145,18 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		t.POST("/payroll/runs/:id/post", s.PostPayrollRun)
 		t.DELETE("/payroll/runs/:id", s.DeletePayrollRun)
 
+		// POS (kassa aparatı)
+		t.GET("/pos/registers", s.ListRegisters)
+		t.POST("/pos/registers", s.CreateRegister)
+		t.PUT("/pos/registers/:id", s.UpdateRegister)
+		t.DELETE("/pos/registers/:id", s.DeleteRegister)
+		t.GET("/pos/registers/:id/open-session", s.GetOpenSession)
+		t.POST("/pos/open-session", s.OpenPosSession)
+		t.GET("/pos/sessions", s.ListPosSessions)
+		t.GET("/pos/sessions/:id", s.GetPosSession)
+		t.POST("/pos/sessions/:id/close", s.ClosePosSession)
+		t.POST("/pos/sale", s.CompletePosSale)
+
 		// e-Qaimə (e-invoice)
 		t.GET("/einvoice/config", s.GetEInvoiceConfig)
 		t.PUT("/einvoice/config", s.UpdateEInvoiceConfig)
