@@ -20,17 +20,32 @@ yoxdur — tək başına işə düşür və müştərilərə ayrıca lisenziya k
   Debitor/Kreditor, Anbar qalıqları.
 - **Müasir veb interfeys** — quraşdırma tələb etmir, brauzerdən işləyir.
 
-## Çox şirkətlilik (Multi-tenant)
+## Çox şirkətlilik (3 səviyyəli Multi-tenant)
 
-Sistem **çox şirkətli**dir — bir quraşdırma çox müştəriyə xidmət edir:
+```
+Superadmin (OAWO)  →  Tenant (müqavilə / abunə)  →  Şirkət (mühasibat vahidi)
+```
 
-- **Şirkət başına ayrı verilənlər bazası** (`oawo_company_<id>`) — tam izolyasiya.
-- **Qlobal istifadəçilər + üzvlük + rollar:** Sahib, Admin, Mühasib, Anbardar, Baxış (yalnız oxu).
-- **Şirkət seçici** — bir istifadəçi bir neçə şirkətə üzv ola və aralarında keçid edə bilər.
-- **Tenant başına modul seçimi** — hər şirkət öz aktiv modullarını (satış, alış, anbar, kassa…) Parametrlərdən idarə edir.
-- Yeni şirkət yaradan istifadəçi avtomatik **sahib** olur; şirkətin bazası (hesablar planı ilə) avtomatik hazırlanır.
+- **Superadmin** yalnız yaratdığı **tenantları** (müqavilələri) və onların hesabatlarını görür.
+  Hər tenant üçün: bir əsas admin yaradır, abunə olduğu **modulları** və **abunə qiymətini** təyin edir.
+  **Ödəniş/abunə məbləği yalnız superadmin-ə görünür.**
+- **Tenant admin** ona verilən tək hesabla tenant daxilində **hər şeyi** idarə edir: çox şirkət yaradır,
+  istifadəçilər yaradır, rollar təyin edir — amma yalnız abunə olduğu modullar çərçivəsində.
+- **Şirkət** başına **ayrı verilənlər bazası** (`oawo_company_<id>`) — tam izolyasiya.
+- **Rollar:** Sahib, Admin, Mühasib, Anbardar, Baxış (yalnız oxu). İcazələr backend-də məcburidir;
+  başqa tenant/şirkətə giriş bloklanır.
+- **Modullar abunəni müəyyən edir** — tenant hansı modulları işlədirsə, qiymət ona görə formalaşır.
 
-Rol icazələri backend-də məcburidir: `Baxış` yalnız oxuyur, üzv olmadığın şirkətə giriş bloklanır.
+## Frontend (React + Tailwind)
+
+İnterfeys **React + Vite + Tailwind CSS** ilə qurulub (`frontend/`). Docker build zamanı statik
+fayllar hazırlanıb Go binary-yə hopdurulur (`go:embed`) — yenə **tək konteyner**.
+
+Lokal frontend inkişafı:
+```bash
+cd frontend && npm install && npm run dev   # http://localhost:5173 (API-ni :8080-ə proxy edir)
+```
+Docker olmadan Go-nu tək işlətmək üçün əvvəlcə `cd frontend && npm run build` (nəticə `backend/web`-ə düşür).
 
 ## Sürətli başlanğıc (Docker)
 
@@ -59,9 +74,10 @@ Backend `:8080` portunda həm API-ni, həm də embedded interfeysi verir.
 ```
 oawo-muhasibat/
 ├── docker-compose.yml        # PostgreSQL + tətbiq
+├── frontend/                # React + Tailwind (Vite) — interfeys
 └── backend/
     ├── main.go               # server + embedded frontend
-    ├── web/                  # interfeys (index.html + app.js) — Go binary-ə hopdurulur
+    ├── web/                  # React build çıxışı (Docker-də yaranır, go:embed)
     └── internal/
         ├── models/           # verilənlər bazası modelləri
         ├── engine/           # ikitərəfli mühərrik + hesabatlar
@@ -70,7 +86,7 @@ oawo-muhasibat/
         └── api/              # REST API + autentifikasiya
 ```
 
-- **Dil:** Go 1.24 (Gin, GORM) + vanilla JS
+- **Backend:** Go 1.24 (Gin, GORM) · **Frontend:** React + Vite + Tailwind CSS
 - **Baza:** PostgreSQL 15
 - **Tək binary:** frontend Go binary-ə hopdurulur (`go:embed`), ayrıca build lazım deyil.
 

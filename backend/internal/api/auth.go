@@ -90,22 +90,49 @@ func (s *Server) Login(c *gin.Context) {
 	}
 	tok := signToken(tokenPayload{UserID: u.ID, Email: u.Email, Superadmin: u.IsSuperadmin,
 		Exp: time.Now().Add(30 * 24 * time.Hour).Unix()})
-	c.JSON(200, gin.H{"token": tok, "user": u, "companies": s.userCompanies(u)})
+	resp := s.meView(u)
+	resp["token"] = tok
+	c.JSON(200, resp)
 }
 
-// companyView is a company plus the caller's role in it.
+// companyView is a company plus the caller's role and the tenant's subscribed
+// modules (which gate the UI). Subscription price is never included here.
 type companyView struct {
 	models.Company
-	Role string `json:"role"`
+	Role    string   `json:"role"`
+	Modules []string `json:"modules"`
+}
+
+// tenantModules returns a tenant's subscribed module keys (cached-free lookup).
+func (s *Server) tenantModules(tenantID uint) []string {
+	var t models.Tenant
+	if err := s.DB.First(&t, tenantID).Error; err != nil {
+		return models.DefaultEnabledModules()
+	}
+	return t.Modules()
 }
 
 func (s *Server) userCompanies(u models.User) []companyView {
 	out := []companyView{}
+	add := func(cmp models.Company, role string) {
+		if !cmp.Enabled {
+			return
+		}
+		out = append(out, companyView{Company: cmp, Role: role, Modules: s.tenantModules(cmp.TenantID)})
+	}
 	if u.IsSuperadmin {
 		var companies []models.Company
-		s.DB.Where("enabled = ?", true).Order("name asc").Find(&companies)
+		s.DB.Where("enabled = ?", true).Order("tenant_id asc, name asc").Find(&companies)
 		for _, cmp := range companies {
-			out = append(out, companyView{Company: cmp, Role: models.RoleOwner})
+			add(cmp, models.RoleOwner)
+		}
+		return out
+	}
+	if u.IsTenantAdmin && u.TenantID != nil {
+		var companies []models.Company
+		s.DB.Where("tenant_id = ? AND enabled = ?", *u.TenantID, true).Order("name asc").Find(&companies)
+		for _, cmp := range companies {
+			add(cmp, models.RoleOwner)
 		}
 		return out
 	}
@@ -113,11 +140,24 @@ func (s *Server) userCompanies(u models.User) []companyView {
 	s.DB.Where("user_id = ? AND enabled = ?", u.ID, true).Find(&memberships)
 	for _, m := range memberships {
 		var cmp models.Company
-		if err := s.DB.First(&cmp, m.CompanyID).Error; err == nil && cmp.Enabled {
-			out = append(out, companyView{Company: cmp, Role: m.Role})
+		if err := s.DB.First(&cmp, m.CompanyID).Error; err == nil {
+			add(cmp, m.Role)
 		}
 	}
 	return out
+}
+
+// meView returns the user plus role flags and (for tenant users) their tenant.
+func (s *Server) meView(u models.User) gin.H {
+	h := gin.H{"user": u, "companies": s.userCompanies(u), "is_superadmin": u.IsSuperadmin, "is_tenant_admin": u.IsTenantAdmin}
+	if u.TenantID != nil {
+		var t models.Tenant
+		if s.DB.First(&t, *u.TenantID).Error == nil {
+			// Tenant users never see the subscription amount.
+			h["tenant"] = gin.H{"id": t.ID, "name": t.Name, "plan": t.Plan, "modules": t.Modules()}
+		}
+	}
+	return h
 }
 
 // Me returns the current user with their companies.
@@ -127,7 +167,7 @@ func (s *Server) Me(c *gin.Context) {
 		c.JSON(404, gin.H{"detail": "İstifadəçi tapılmadı"})
 		return
 	}
-	c.JSON(200, gin.H{"user": u, "companies": s.userCompanies(u)})
+	c.JSON(200, s.meView(u))
 }
 
 // ChangePassword updates the current user's password.
@@ -196,14 +236,24 @@ func (s *Server) TenantMiddleware() gin.HandlerFunc {
 		if c.GetBool("isSuperadmin") {
 			role = models.RoleOwner
 		} else {
-			var m models.Membership
-			if err := s.DB.Where("user_id = ? AND company_id = ? AND enabled = ?",
-				c.GetUint("userID"), company.ID, true).First(&m).Error; err != nil {
-				c.JSON(403, gin.H{"detail": "Bu şirkətə girişiniz yoxdur"})
+			var u models.User
+			if err := s.DB.First(&u, c.GetUint("userID")).Error; err != nil {
+				c.JSON(401, gin.H{"detail": "İstifadəçi tapılmadı"})
 				c.Abort()
 				return
 			}
-			role = m.Role
+			if u.IsTenantAdmin && u.TenantID != nil && company.TenantID == *u.TenantID {
+				role = models.RoleOwner // tenant admin: full access to all tenant companies
+			} else {
+				var m models.Membership
+				if err := s.DB.Where("user_id = ? AND company_id = ? AND enabled = ?",
+					u.ID, company.ID, true).First(&m).Error; err != nil {
+					c.JSON(403, gin.H{"detail": "Bu şirkətə girişiniz yoxdur"})
+					c.Abort()
+					return
+				}
+				role = m.Role
+			}
 		}
 
 		if !company.Provisioned {

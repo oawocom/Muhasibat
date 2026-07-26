@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-bg text-slate-100 antialiased;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, rgba(91,140,255,.08), transparent),
+      radial-gradient(1000px 500px at 100% 0, rgba(124,92,255,.07), transparent);
+  }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface2 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-brand disabled:opacity-50; }
+  .btn-primary { @apply border-0 bg-gradient-to-br from-brand to-brand2 text-white hover:opacity-90; }
+  .btn-danger { @apply border-danger/40 text-danger hover:border-danger; }
+  .btn-ghost { @apply bg-transparent; }
+  .btn-sm { @apply px-3 py-1.5 text-xs rounded-lg; }
+  .card { @apply rounded-2xl border border-line bg-surface p-5; }
+  .panel { @apply rounded-2xl border border-line bg-surface overflow-hidden; }
+  .input { @apply w-full rounded-xl border border-line bg-surface2 px-3 py-2 text-sm outline-none focus:border-brand; }
+  .label { @apply mb-1.5 block text-xs text-slate-400; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface2 px-2.5 py-0.5 text-xs text-slate-400; }
+  .th { @apply bg-surface2 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-400; }
+  .td { @apply border-t border-line px-4 py-2.5 text-sm; }
+  .mono { font-variant-numeric: tabular-nums; }
+}

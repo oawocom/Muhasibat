@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -65,11 +66,20 @@ func Bootstrap(db *gorm.DB, mgr *tenant.Manager) error {
 		log.Printf("👤 Superadmin yaradıldı: %s", admin.Email)
 	}
 
-	// Default company on first boot.
+	// Default tenant + company on first boot (so the app is usable and the
+	// superadmin can demo bookkeeping immediately).
 	var count int64
-	db.Model(&models.Company{}).Count(&count)
+	db.Model(&models.Tenant{}).Count(&count)
 	if count == 0 {
-		company := models.Company{Name: envOr("COMPANY_NAME", "OAWO MMC"), Enabled: true}
+		modules, _ := json.Marshal(models.DefaultEnabledModules())
+		t := models.Tenant{
+			Name: envOr("COMPANY_NAME", "OAWO"), Plan: "standard",
+			EnabledModules: string(modules), BillingCycle: "monthly", Enabled: true,
+		}
+		if err := db.Create(&t).Error; err != nil {
+			return fmt.Errorf("default tenant: %w", err)
+		}
+		company := models.Company{TenantID: t.ID, Name: envOr("COMPANY_NAME", "OAWO MMC"), Enabled: true}
 		if err := db.Create(&company).Error; err != nil {
 			return fmt.Errorf("default company: %w", err)
 		}
@@ -79,8 +89,7 @@ func Bootstrap(db *gorm.DB, mgr *tenant.Manager) error {
 			return fmt.Errorf("provision default company: %w", err)
 		}
 		db.Model(&models.Company{}).Where("id = ?", company.ID).Update("provisioned", true)
-		db.Create(&models.Membership{UserID: admin.ID, CompanyID: company.ID, Role: models.RoleOwner, Enabled: true})
-		log.Printf("🏢 Default şirkət yaradıldı: %s", company.Name)
+		log.Printf("🏢 Default tenant + şirkət yaradıldı: %s", company.Name)
 	}
 	return nil
 }

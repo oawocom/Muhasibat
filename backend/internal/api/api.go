@@ -42,6 +42,12 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		auth.GET("/module-catalog", s.ModuleCatalogHandler)
 		auth.GET("/roles", s.Roles)
 
+		// Tenants / subscriptions (superadmin only — enforced in handlers)
+		auth.GET("/tenants", s.ListTenants)
+		auth.POST("/tenants", s.CreateTenant)
+		auth.GET("/tenants/:id", s.GetTenant)
+		auth.PUT("/tenants/:id", s.UpdateTenant)
+
 		// Companies & members (control-plane)
 		auth.GET("/companies", s.ListCompanies)
 		auth.POST("/companies", s.CreateCompany)
