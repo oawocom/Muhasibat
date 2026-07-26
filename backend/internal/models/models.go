@@ -242,6 +242,52 @@ type DepreciationEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// ==================== PAYROLL ====================
+type Employee struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	Code        string    `json:"code" gorm:"size:32;index"`
+	FullName    string    `json:"full_name" gorm:"size:255;not null"`
+	Position    string    `json:"position" gorm:"size:255"`
+	TaxID       string    `json:"tax_id" gorm:"size:50"` // FIN
+	BankAccount string    `json:"bank_account" gorm:"size:64"`
+	HireDate    *Date     `json:"hire_date"`
+	Salary      float64   `json:"salary" gorm:"type:decimal(18,2);default:0"` // aylıq gross
+	Status      string    `json:"status" gorm:"size:16;index;default:active"` // active|inactive
+	Notes       string    `json:"notes" gorm:"type:text"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type PayrollRun struct {
+	ID              uint          `json:"id" gorm:"primaryKey"`
+	Period          Date          `json:"period" gorm:"index;not null"` // ayın birinci günü
+	Status          string        `json:"status" gorm:"size:16;index;default:draft"` // draft|posted
+	GrossTotal      float64       `json:"gross_total" gorm:"type:decimal(18,2);default:0"`
+	DeductionsTotal float64       `json:"deductions_total" gorm:"type:decimal(18,2);default:0"`
+	EmployerTotal   float64       `json:"employer_total" gorm:"type:decimal(18,2);default:0"`
+	NetTotal        float64       `json:"net_total" gorm:"type:decimal(18,2);default:0"`
+	JournalID       *uint         `json:"journal_id" gorm:"index"`
+	Lines           []PayrollLine `json:"lines" gorm:"foreignKey:RunID;constraint:OnDelete:CASCADE"`
+	CreatedAt       time.Time     `json:"created_at"`
+	UpdatedAt       time.Time     `json:"updated_at"`
+}
+
+type PayrollLine struct {
+	ID           uint    `json:"id" gorm:"primaryKey"`
+	RunID        uint    `json:"run_id" gorm:"index;not null"`
+	EmployeeID   uint    `json:"employee_id" gorm:"index"`
+	EmployeeName string  `json:"employee_name" gorm:"size:255"`
+	Gross        float64 `json:"gross" gorm:"type:decimal(18,2)"`
+	IncomeTax    float64 `json:"income_tax" gorm:"type:decimal(18,2)"`
+	DsmfEmp      float64 `json:"dsmf_emp" gorm:"type:decimal(18,2)"`
+	UnempEmp     float64 `json:"unemp_emp" gorm:"type:decimal(18,2)"`
+	MedicalEmp   float64 `json:"medical_emp" gorm:"type:decimal(18,2)"`
+	Net          float64 `json:"net" gorm:"type:decimal(18,2)"`
+	DsmfEmpr     float64 `json:"dsmf_empr" gorm:"type:decimal(18,2)"`
+	UnempEmpr    float64 `json:"unemp_empr" gorm:"type:decimal(18,2)"`
+	MedicalEmpr  float64 `json:"medical_empr" gorm:"type:decimal(18,2)"`
+}
+
 // TenantModels returns every accounting model — migrated into each
 // company's own database. (Users live in the platform DB, not here.)
 func TenantModels() []interface{} {
@@ -250,5 +296,6 @@ func TenantModels() []interface{} {
 		&Product{}, &StockMove{}, &JournalEntry{}, &JournalLine{},
 		&Document{}, &DocumentLine{}, &Sequence{}, &Setting{},
 		&FixedAsset{}, &DepreciationEntry{},
+		&Employee{}, &PayrollRun{}, &PayrollLine{},
 	}
 }

@@ -127,6 +127,20 @@ func (s *Server) RegisterRoutes(r *gin.Engine) {
 		t.GET("/fixed-assets/:id/depreciation", s.ListDepreciation)
 		t.POST("/depreciation/run", s.RunDepreciationHandler)
 
+		// Payroll
+		t.GET("/employees", s.ListEmployees)
+		t.GET("/employees/:id", s.GetEmployee)
+		t.POST("/employees", s.CreateEmployee)
+		t.PUT("/employees/:id", s.UpdateEmployee)
+		t.DELETE("/employees/:id", s.DeleteEmployee)
+		t.GET("/payroll/config", s.GetPayrollConfig)
+		t.PUT("/payroll/config", s.UpdatePayrollConfig)
+		t.GET("/payroll/runs", s.ListPayrollRuns)
+		t.POST("/payroll/runs", s.CreatePayrollRun)
+		t.GET("/payroll/runs/:id", s.GetPayrollRun)
+		t.POST("/payroll/runs/:id/post", s.PostPayrollRun)
+		t.DELETE("/payroll/runs/:id", s.DeletePayrollRun)
+
 		// Reports
 		t.GET("/reports/trial-balance", s.TrialBalance)
 		t.GET("/reports/ledger/:accountId", s.Ledger)

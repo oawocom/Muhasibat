@@ -133,8 +133,8 @@ func seedAccounts(db *gorm.DB) error {
 		{Code: "531", Name: "Malsatan və podratçılara borclar (kreditorlar)", Type: "liability", SystemKey: "ap", Parent: "5"},
 		{Code: "537", Name: "Alınmış avanslar", Type: "liability", Parent: "5"},
 		{Code: "521", Name: "ƏDV üzrə ödəniləcək (çıxış)", Type: "liability", SystemKey: "vat_out", Parent: "5"},
-		{Code: "522", Name: "Digər vergi öhdəlikləri", Type: "liability", Parent: "5"},
-		{Code: "533", Name: "Əməyin ödənişi üzrə öhdəliklər", Type: "liability", Parent: "5"},
+		{Code: "522", Name: "Digər vergi və sosial öhdəliklər", Type: "liability", SystemKey: "tax_payable", Parent: "5"},
+		{Code: "533", Name: "Əməyin ödənişi üzrə öhdəliklər", Type: "liability", SystemKey: "wages_payable", Parent: "5"},
 
 		// ---- GƏLİRLƏR (Income) ----
 		{Code: "6", Name: "GƏLİRLƏR", Type: "income", Group: true},
@@ -148,6 +148,7 @@ func seedAccounts(db *gorm.DB) error {
 		{Code: "711", Name: "Kommersiya (satış) xərcləri", Type: "expense", SystemKey: "expense", Parent: "7"},
 		{Code: "721", Name: "İnzibati xərclər", Type: "expense", Parent: "7"},
 		{Code: "722", Name: "Amortizasiya xərcləri", Type: "expense", SystemKey: "dep_expense", Parent: "7"},
+		{Code: "728", Name: "Əmək haqqı xərcləri", Type: "expense", SystemKey: "salary_expense", Parent: "7"},
 		{Code: "731", Name: "Sair əməliyyat xərcləri", Type: "expense", Parent: "7"},
 		{Code: "741", Name: "Maliyyə xərcləri", Type: "expense", Parent: "7"},
 	}
