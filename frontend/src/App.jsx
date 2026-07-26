@@ -96,16 +96,14 @@ function Sidebar({ onSwitch }) {
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand to-brand2 font-extrabold text-white">O</div>
         <b className="text-[15px]">OAWO Mühasibat</b>
       </div>
-      {!auth.isSuper && (
-        <button onClick={onSwitch}
-          className="mx-3 mb-2.5 flex items-center justify-between gap-2 rounded-xl border border-line bg-surface2 px-3 py-2.5 hover:border-brand">
-          <span className="flex flex-col overflow-hidden text-left">
-            <span className="truncate font-bold">{auth.company ? auth.company.name : 'Şirkət seç'}</span>
-            <span className="text-[11px] text-slate-400">{auth.company ? roleLabel(auth.company.role) : '—'}</span>
-          </span>
-          <span className="text-slate-400">⇅</span>
-        </button>
-      )}
+      <button onClick={onSwitch}
+        className="mx-3 mb-2.5 flex items-center justify-between gap-2 rounded-xl border border-line bg-surface2 px-3 py-2.5 hover:border-brand">
+        <span className="flex flex-col overflow-hidden text-left">
+          <span className="truncate font-bold">{auth.company ? auth.company.name : (auth.isSuper ? 'Şirkət seç (hesabatlar üçün)' : 'Şirkət seç')}</span>
+          <span className="text-[11px] text-slate-400">{auth.company ? roleLabel(auth.company.role) : '—'}</span>
+        </span>
+        <span className="text-slate-400">⇅</span>
+      </button>
       <nav className="px-2.5 pb-3">
         {nav.map((n, i) =>
           n.g ? (
@@ -122,11 +120,12 @@ function Sidebar({ onSwitch }) {
           ),
         )}
       </nav>
-      <div className="mt-auto p-3.5">
-        <div className="flex items-center justify-between rounded-full border border-line bg-surface2 px-3 py-1.5 text-sm">
-          <span className="truncate text-slate-400">{auth.user?.name || auth.user?.email}</span>
-          <button title="Çıxış" className="text-slate-400 hover:text-slate-100" onClick={auth.logout}>⇥</button>
-        </div>
+      <div className="mt-auto space-y-2 p-3.5">
+        <div className="truncate px-1 text-xs text-slate-400">{auth.user?.name || auth.user?.email}</div>
+        <button onClick={auth.logout}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 py-2 text-sm font-semibold text-slate-200 hover:border-danger hover:text-danger">
+          ⇥ Çıxış
+        </button>
       </div>
     </aside>
   )

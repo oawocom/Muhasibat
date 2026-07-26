@@ -209,8 +209,16 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Set("userID", p.UserID)
-		c.Set("isSuperadmin", p.Superadmin)
+		// Load the user so role flags come from the DB (authoritative), not the
+		// token — this keeps older tokens correct after a role change.
+		var u models.User
+		if err := s.DB.First(&u, p.UserID).Error; err != nil || !u.Enabled {
+			c.JSON(401, gin.H{"detail": "İstifadəçi tapılmadı və ya deaktivdir"})
+			c.Abort()
+			return
+		}
+		c.Set("userID", u.ID)
+		c.Set("isSuperadmin", u.IsSuperadmin)
 		c.Next()
 	}
 }

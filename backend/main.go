@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"oawo-muhasibat/internal/api"
+	"oawo-muhasibat/internal/demo"
 	"oawo-muhasibat/internal/store"
 	"oawo-muhasibat/internal/tenant"
 )
@@ -28,6 +29,9 @@ func main() {
 	mgr := tenant.NewManager(db, tenant.ConfigFromEnv())
 	if err := store.Bootstrap(db, mgr); err != nil {
 		log.Fatalf("Bootstrap xətası: %v", err)
+	}
+	if err := demo.Seed(db, mgr); err != nil {
+		log.Printf("Demo seed xətası (davam edilir): %v", err)
 	}
 
 	if os.Getenv("GIN_MODE") == "" {
