@@ -1,14 +1,14 @@
-# OAWO Mühasibat — reverse proxy + TLS termination.
+# OAWO Mühasibat — reverse proxy + TLS.
 #
-# Cloudflare proxy (turuncu bulud) ilə işləyir: Cloudflare istifadəçiyə
-# öz sertifikatını verir, origin serverə isə bu Caddy 443-də Cloudflare
-# Origin Certificate ilə cavab verir.  Cloudflare SSL/TLS rejimi:
-# "Full (strict)".
+# Cloudflare proxy (turuncu bulud) ilə işləyir:
+#  - Cloudflare istifadəçiyə öz (avtomatik) SSL sertifikatını verir;
+#  - origin serverdə isə bu Caddy 443-də `tls internal` ilə öz-özünə
+#    imzalanmış sertifikat yaradır və avtomatik yeniləyir — heç bir əl ilə
+#    sertifikat, token və ya renewal lazım deyil.
 #
-# Sertifikatı yaratmaq (bir dəfə):
-#   Cloudflare → SSL/TLS → Origin Server → Create Certificate
-#   Yaranan sertifikatı  caddy/certs/origin.pem,  açarı  caddy/certs/origin.key
-#   fayllarına yaz.
+# Cloudflare SSL/TLS rejimi: "Full"  (strict YOX).
+# "Full" origin sertifikatını yoxlamır, ona görə self-signed kifayətdir,
+# amma Cloudflare↔origin trafiki yenə də şifrələnir.
 
 {
 	admin off
@@ -17,6 +17,6 @@
 
 accounting.oawo.com {
 	encode zstd gzip
-	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+	tls internal
 	reverse_proxy app:8080
 }
