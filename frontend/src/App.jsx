@@ -88,7 +88,7 @@ function CompanySwitcher({ onClose }) {
   )
 }
 
-function Sidebar({ onSwitch, theme, onToggleTheme }) {
+function Sidebar({ onSwitch }) {
   const auth = useAuth()
   const nav = buildNav(auth)
   return (
@@ -121,19 +121,24 @@ function Sidebar({ onSwitch, theme, onToggleTheme }) {
           ),
         )}
       </nav>
-      <div className="mt-auto space-y-2 p-3.5">
-        <div className="flex items-center justify-between">
-          <span className="truncate px-1 text-xs text-muted">{auth.user?.name || auth.user?.email}</span>
-          <button onClick={onToggleTheme} title="Tema" className="rounded-lg border border-line bg-surface2 px-2 py-1 text-sm hover:border-brand">
-            {theme === 'dark' ? '☀' : '🌙'}
-          </button>
-        </div>
-        <button onClick={auth.logout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface2 py-2 text-sm font-semibold text-text hover:border-danger hover:text-danger">
-          ⇥ Çıxış
-        </button>
-      </div>
     </aside>
+  )
+}
+
+// Top-right bar: user, theme toggle, logout.
+function TopBar({ theme, onToggleTheme }) {
+  const auth = useAuth()
+  return (
+    <header className="sticky top-0 z-20 flex items-center justify-end gap-2 border-b border-line bg-surface/80 px-6 py-2.5 backdrop-blur">
+      <span className="mr-1 hidden truncate text-sm text-muted sm:inline">{auth.user?.name || auth.user?.email}</span>
+      <button onClick={onToggleTheme} title="Tema" className="rounded-lg border border-line bg-surface2 px-2.5 py-1.5 text-sm hover:border-brand">
+        {theme === 'dark' ? '☀' : '🌙'}
+      </button>
+      <button onClick={auth.logout}
+        className="flex items-center gap-1.5 rounded-lg border border-line bg-surface2 px-3 py-1.5 text-sm font-semibold text-text hover:border-danger hover:text-danger">
+        ⇥ Çıxış
+      </button>
+    </header>
   )
 }
 
@@ -164,8 +169,9 @@ export default function App() {
 
   return (
     <div className="flex h-full">
-      <Sidebar onSwitch={() => setSwitching(true)} theme={theme} onToggleTheme={toggleTheme} />
+      <Sidebar onSwitch={() => setSwitching(true)} />
       <main className="flex-1 overflow-y-auto">
+        <TopBar theme={theme} onToggleTheme={toggleTheme} />
         <div className="px-6 py-5">
           <Routes>
             <Route path="/" element={auth.isSuper ? <Navigate to="/tenants" replace /> : <RequireCompany><Dashboard /></RequireCompany>} />
